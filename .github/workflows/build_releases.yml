@@ -2,8 +2,12 @@ name: Build & Release Binary Executables
 
 on:
   push:
+    branches: [ main, cli-package ]
     tags:
       - 'v*'
+  pull_request:
+    branches: [ main, cli-package ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -49,9 +53,18 @@ jobs:
             mv dist/cli-agent dist/${{ matrix.asset_name }}
           fi
 
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
+
       - name: Upload Binary to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cli-package' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v1.0.5' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Release v1.0.5' }}
           files: dist/${{ matrix.asset_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
