@@ -34,6 +34,7 @@ def build():
     cmd = [
         py_exec, "-m", "PyInstaller",
         "--onefile",
+        "--log-level", "WARN",
         "--name", binary_name,
         "--paths", src_dir,
         "--add-data", data_arg,
