@@ -173,28 +173,44 @@ class PydanticAgentEngine(IAgentEngine):
             self._emit_trace("tool_result", {"tool": "git_operations", "output": res})
             return res
 
-    def run_task(self, user_request: str) -> Dict[str, str]:
+    def run_task(self, user_request: str) -> Dict[str, Any]:
         """
-        Executes user request through PydanticAI Agent with multi-turn tool calling and memory persistence.
+        Executes user request through PydanticAI Agent with real-time chronological
+        thought streaming, multi-turn tool calling, and memory persistence.
         """
+        import asyncio
         self._tools_invoked_in_turn = []
         skills_count = len(self.skill_registry.list_skills())
         routing_summary = f"**[PydanticAI Engine]** Type-safe execution with {skills_count} skills & Tri-Tier Memory."
 
+        async def _execute():
+            thought_blocks = []
+            async with self._agent.iter(user_request) as runner:
+                async for node in runner:
+                    if hasattr(node, "model_response") and node.model_response:
+                        for part in node.model_response.parts:
+                            if isinstance(part, ThinkingPart) and part.content:
+                                thought_text = part.content.strip()
+                                thought_blocks.append(thought_text)
+                                self._emit_trace("thinking", thought_text)
+
+            result = runner.result
+            output_str = str(result.output or "").strip()
+            return output_str, thought_blocks
+
         try:
             self._rebuild_agent(user_query=user_request)
-            result = self._agent.run_sync(user_request)
-            
-            # Extract any thinking parts from all messages
-            thought_blocks = []
-            for msg in result.all_messages():
-                if isinstance(msg, ModelResponse):
-                    for part in msg.parts:
-                        if isinstance(part, ThinkingPart) and part.content:
-                            thought_blocks.append(part.content.strip())
-                            self._emit_trace("thinking", part.content.strip())
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
-            output_text = str(result.output or "").strip()
+            if loop and loop.is_running():
+                import nest_asyncio
+                nest_asyncio.apply()
+                output_text, thought_blocks = loop.run_until_complete(_execute())
+            else:
+                output_text, thought_blocks = asyncio.run(_execute())
 
             if not output_text:
                 output_text = "Task completed successfully."
@@ -231,3 +247,4 @@ class PydanticAgentEngine(IAgentEngine):
                 "routing": "Execution Notice",
                 "execution": f"Error executing task: {err_str}"
             }
+
