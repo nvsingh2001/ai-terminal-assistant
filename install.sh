@@ -1,11 +1,12 @@
 #!/bin/sh
 set -e
 
-REPO="Ayushsingh-02082004/ai-terminal-assistant"
-INSTALL_DIR="$HOME/.cli-agent/bin"
-EXE_PATH="$INSTALL_DIR/cli-agent"
+REPO="nvsingh2001/ai-terminal-assistant"
+INSTALL_DIR="$HOME/.local/bin"
+EXE_PATH="$INSTALL_DIR/aegis"
+ALIAS_PATH="$INSTALL_DIR/cli-agent"
 
-echo "=== Installing CLI Agent (cli-agent) ==="
+echo "=== Installing Aegis Terminal Agent (aegis) ==="
 
 # Detect OS and Arch
 OS="$(uname -s)"
@@ -13,15 +14,15 @@ ARCH="$(uname -m)"
 
 if [ "$OS" = "Darwin" ]; then
     if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
-        BINARY_NAME="cli-agent-darwin-arm64"
+        BINARY_NAME="aegis-darwin-arm64"
     else
-        BINARY_NAME="cli-agent-darwin-amd64"
+        BINARY_NAME="aegis-darwin-amd64"
     fi
 elif [ "$OS" = "Linux" ]; then
     if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
-        BINARY_NAME="cli-agent-linux-amd64"
+        BINARY_NAME="aegis-linux-amd64"
     else
-        BINARY_NAME="cli-agent-linux-amd64"
+        BINARY_NAME="aegis-linux-amd64"
     fi
 else
     echo "Unsupported Operating System: $OS"
@@ -35,8 +36,9 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$BINARY_NAME"
 echo "Downloading $BINARY_NAME from GitHub Releases..."
 curl -fsSL "$DOWNLOAD_URL" -o "$EXE_PATH"
 chmod +x "$EXE_PATH"
+ln -sf "$EXE_PATH" "$ALIAS_PATH"
 
-echo "Successfully installed cli-agent to $EXE_PATH"
+echo "Successfully installed aegis to $EXE_PATH (and symlinked $ALIAS_PATH)"
 
 # Check if PATH contains install directory
 case ":$PATH:" in
@@ -58,4 +60,4 @@ esac
 
 echo ""
 echo "=== Installation Complete! ==="
-echo "Open any terminal window and type: cli-agent"
+echo "Open any terminal window and type: aegis"

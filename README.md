@@ -1,82 +1,112 @@
-# AI Command Line Agent (CrewAI Terminal Assistant)
+# Aegis (Autonomous AI Terminal Agent)
 
-An intelligent, AI-powered Command Line Interface (CLI) assistant built using **CrewAI** and **Python**. It translates natural language prompts into automated local actions using a two-agent sequential architecture (Router & Executor) and executes them using specialized tools.
+```text
+   █████╗ ███████╗ ██████╗ ██╗███████╗
+  ██╔══██╗██╔════╝██╔════╝ ██║██╔════╝
+  ███████║█████╗  ██║  ███╗██║███████╗
+  ██╔══██║██╔══╝  ██║   ██║██║╚════██║
+  ██║  ██║███████╗╚██████╔╝██║███████║
+  ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═╝╚══════╝
+```
 
-## Architecture Flow
+**Aegis** is an autonomous, next-generation AI command-line agent engineered with **PydanticAI**, **Dependency Injection**, **Strategy Pattern**, and a production **Tri-Tier Long-Term Memory Engine** (Global Preferences, Project Knowledge Graph, Episodic Recall).
 
-The system uses a sequential agent pipeline:
-1.  **Router Agent**: Analyzes your natural language command, determines the intent category (Shell, File, Code, Git), and builds a structured step-by-step execution plan.
-2.  **Executor Agent**: Equipped with custom Python toolsets, it carries out the Router's plan by executing local terminal or file operations.
-3.  **Output Layer**: Receives the raw result and formats it into a premium, colored terminal UI using the `rich` library.
-
----
-
-## Prerequisites
-* Python 3.10 to 3.13
-* Git
+It translates plain English developer instructions into validated terminal, file, code, and Git operations directly in your terminal.
 
 ---
 
-## Installation & Setup
+## Key Features
 
-### 1. Clone the repository
+* **PydanticAI Type-Safe Engine**: Robust multi-turn reasoning loops with validated tool calling.
+* **Production Tri-Tier Memory**:
+  * **Tier 1 (Global Preferences)**: User-wide defaults and tool preferences saved in `~/.cli-agent/memory.db`.
+  * **Tier 2 (Project Knowledge Graph)**: Project-scoped architectural rules, virtualenv paths, and conventions.
+  * **Tier 3 (Episodic Recall)**: Automatically indexed past task solutions with relevance recall.
+* **Real-Time Execution & Thinking Trace (`/verbose`)**: Inspect the agent's internal reasoning steps and live tool arguments in real time.
+* **Universal Model Flexibility (`/model`)**: Seamlessly switch between Local Ollama models (`qwen2.5-coder`, `qwen3.5:4b`), llama.cpp GGUF files, and Cloud APIs (Gemini, Claude, GPT-4o).
+* **Autonomous Skill System**:
+  * `shell_execution`: Real-time bash shell execution with environment detection.
+  * `file_management`: AST-aware token budgeting, reading, writing, and sensitive path guardrails.
+  * `code_editing`: AST/pattern searches, surgical edits, and syntax validation.
+  * `git_operations`: Status, diff, commit, branch, and log automation.
+
+---
+
+## Quick Start
+
+### Installation
+
 ```bash
-git clone https://github.com/Ayushsingh-02082004/ai-terminal-assistant.git
+# Clone the repository
+git clone https://github.com/nvsingh2001/ai-terminal-assistant.git
 cd ai-terminal-assistant
-```
 
-### 2. Set up a Virtual Environment
-It is recommended to run the project in a clean virtual environment:
-```bash
-python -m venv venv
-
-# Activate it (Windows PowerShell):
-.\venv\Scripts\Activate.ps1
-
-# Activate it (macOS/Linux):
+# Create virtual environment & install
+python3 -m venv venv
 source venv/bin/activate
-```
+pip install -r requirements.txt
 
-### 3. Install Dependencies
-```bash
-pip install -r backend/requirements.txt
-```
-
-### 4. Configure your Environment variables
-Create your local `.env` file in the `backend/` folder:
-```bash
-cp backend/.env.example backend/.env
-```
-Open `backend/.env` and fill in your **Ollama Cloud** (or custom endpoint) credentials:
-```ini
-OLLAMA_API_KEY=your_private_api_key_here
-OLLAMA_MODEL_NAME=gemma4:31b-cloud
-OLLAMA_API_BASE=https://ollama.com/v1
-```
-
----
-
-## Running the CLI Agent
-To start the interactive loop, navigate to the `backend/` directory and run:
-```bash
-cd backend
+# Run directly
 python run.py
 ```
 
-### Example Commands to Try:
-*   `list all files in the current folder`
-*   `create a file named hello.txt with the content "Hello World"`
-*   `check the git status of the repository`
-*   `verify the python syntax of backend/run.py`
-*   `find the file names in the backend folder whose size is less than 20 MB`
+Or install the standalone binary to your system PATH:
+```bash
+python build_installer.py
+cp dist/aegis ~/.local/bin/aegis
+chmod +x ~/.local/bin/aegis
+ln -sf ~/.local/bin/aegis ~/.local/bin/cli-agent
+```
+
+Then simply launch from any terminal:
+```bash
+aegis
+```
 
 ---
 
-## Project Structure
-*   `backend/run.py` — Application launcher.
-*   `backend/src/cli_agent/main.py` — CLI user loop.
-*   `backend/src/cli_agent/crew.py` — Orchestrator tying LLMs, agents, and tasks together.
-*   `backend/src/cli_agent/config/agents.yaml` — Declarative roles for Router and Executor.
-*   `backend/src/cli_agent/config/tasks.yaml` — Declarative routing and execution tasks.
-*   `backend/src/cli_agent/services/` — Custom Python tools (Shell, File, Code, Git).
-*   `backend/src/cli_agent/utils/formatter.py` — CLI terminal output styling.
+## Interactive Slash Commands
+
+| Command | Description |
+| :--- | :--- |
+| `/model` | Switch active LLM model or cloud provider |
+| `/skills` | View active skill palette and tool parameters |
+| `/memory` | View active Tri-Tier Long-Term Memory (`/mem`) |
+| `/remember <fact>` | Store project knowledge or global preference (`/remember --global`) |
+| `/forget <id\|key>` | Delete a memory entry or clear project facts (`/forget --all`) |
+| `/verbose` | Toggle real-time thinking and tool execution trace (`/trace`) |
+| `/clear` | Reset active conversation memory buffer |
+| `/help` | Show interactive commands help menu |
+| `/exit` | Exit Aegis terminal session |
+
+---
+
+## Architecture Overview
+
+```text
+               ┌──────────────────────────────┐
+               │    User Request / Prompt     │
+               └──────────────┬───────────────┘
+                              │
+                              ▼
+               ┌──────────────────────────────┐
+               │    NativeCLIAgent (REPL)     │
+               └──────────────┬───────────────┘
+                              │
+               ┌──────────────┴───────────────┐
+               │  CommandDispatcher (OCP/Cmd) │
+               └──────────────┬───────────────┘
+                              │
+      ┌───────────────────────┼───────────────────────┐
+      ▼                       ▼                       ▼
+┌──────────────┐    ┌──────────────────┐    ┌───────────────────┐
+│ SkillRegistry│    │ TriTierMemoryMgr │    │  PydanticAI Engine│
+│ (Tool Layer) │    │ (SQLite WAL DB)  │    │  (LLM Execution)  │
+└──────────────┘    └──────────────────┘    └───────────────────┘
+```
+
+---
+
+## License
+
+MIT License.

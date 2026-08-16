@@ -14,6 +14,7 @@ from prompt_toolkit.completion import WordCompleter
 
 from cli_agent.container import ServiceContainer
 from cli_agent.services import try_fast_path_execution, get_system_info
+from cli_agent.ui.banner import print_aegis_banner
 
 # Rich Console instance
 console = Console()
@@ -85,17 +86,18 @@ class NativeCLIAgent:
             console.print(f"  [dim #94a3b8]↳ Result: {preview}[/dim #94a3b8]\n")
 
     def print_header(self):
-        """Displays minimalist 1-line startup banner with trace status."""
+        """Displays Aegis ANSI art logo and startup status bar."""
         active_skills_count = len(self.container.skill_registry.list_skills())
         branch = self.sys_info.get('git_branch', 'main')
-        trace_status = "[bold #10b981]ON[/bold #10b981]" if self.verbose_enabled else "[dim #64748b]OFF[/dim #64748b]"
         proj_id = self.container.tri_tier_memory.project_id
-        
-        console.print()
-        console.print(f"[bold #10b981]✦ AI COMMAND LINE AGENT[/bold #10b981] [dim #94a3b8]v2.0[/dim #94a3b8]")
-        console.print(f"  [dim #94a3b8]Model:[/dim #94a3b8] [bold #38bdf8]{self.model_name}[/bold #38bdf8]  │  [dim #94a3b8]Branch:[/dim #94a3b8] [dim #f8fafc]{branch}[/dim #f8fafc]  │  [dim #94a3b8]Skills:[/dim #94a3b8] [bold #a855f7]{active_skills_count} loaded[/bold #a855f7]  │  [dim #94a3b8]Trace:[/dim #94a3b8] {trace_status}")
-        console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b], [/dim #64748b][bold #38bdf8]/memory[/bold #38bdf8][dim #64748b] for long-term facts, [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models.[/dim #64748b]")
-        console.print()
+        print_aegis_banner(
+            console=console,
+            model_name=self.model_name,
+            git_branch=branch,
+            skills_count=active_skills_count,
+            verbose_enabled=self.verbose_enabled,
+            project_id=proj_id
+        )
 
     def execute_request(self, user_request: str):
         """Processes user request with fast-path execution and PydanticAgentEngine."""

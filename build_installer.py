@@ -14,7 +14,7 @@ def build():
     sep = ";" if sys.platform == "win32" else ":"
     data_arg = f"{config_dir}{sep}cli_agent/config"
     
-    binary_name = "cli-agent"
+    binary_name = "aegis"
     
     src_dir = os.path.join(root_dir, "src")
     
