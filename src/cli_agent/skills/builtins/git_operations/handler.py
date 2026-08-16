@@ -19,13 +19,27 @@ class GitOperationsSkill(BaseSkill):
             }
         )
 
-    def execute(self, operation: str = "status", args: str = "", **kwargs) -> str:
-        operation = operation.lower().strip()
-        allowed_ops = ["status", "diff", "add", "commit", "log", "branch"]
-        if operation not in allowed_ops:
-            return f"Error: Operation '{operation}' is not allowed."
+    def execute(
+        self,
+        operation: str = "status",
+        args: str = "",
+        action: str = "",
+        branch_name: str = "",
+        commit_message: str = "",
+        **kwargs
+    ) -> str:
+        op = (action or operation or "status").lower().strip()
+        allowed_ops = ["status", "diff", "add", "commit", "log", "branch", "checkout", "stash"]
+        if op not in allowed_ops:
+            return f"Error: Operation '{op}' is not allowed."
 
-        command = f"git {operation} {args}".strip()
+        cmd_args = args.strip()
+        if op == "commit" and commit_message and "-m" not in cmd_args:
+            cmd_args = f'-m "{commit_message}" {cmd_args}'.strip()
+        elif op == "branch" and branch_name and branch_name not in cmd_args:
+            cmd_args = f"{branch_name} {cmd_args}".strip()
+
+        command = f"git {op} {cmd_args}".strip()
         try:
             result = subprocess.run(
                 command,
@@ -37,11 +51,11 @@ class GitOperationsSkill(BaseSkill):
             )
             output = []
             if result.stdout:
-                output.append(result.stdout)
+                output.append(result.stdout.strip())
             if result.stderr:
-                output.append(result.stderr)
+                output.append(result.stderr.strip())
             if not output:
-                return f"Git operation executed successfully with code {result.returncode}."
+                return f"Git operation '{op}' executed successfully with code {result.returncode}."
             return "\n".join(output)
         except subprocess.TimeoutExpired:
             return "Error: Git command timed out."
