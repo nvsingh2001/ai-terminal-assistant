@@ -18,12 +18,13 @@ class HybridLLMEngine:
     def complete(self, messages: List[Dict[str, Any]], tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Routes completion to local GGUF, local Ollama, or Cloud provider."""
         # 1. Check if model specifies local GGUF llama.cpp execution
-        if self.model_name.startswith("llama-cpp") or self.model_name.endswith(".gguf"):
-            res = self.llama_cpp_engine.generate_completion(messages, tools)
+        if self.model_name.startswith("llama-cpp") or self.model_name.endswith(".gguf") or os.path.exists(self.model_name):
+            gguf_engine = LlamaCppEngine(model_path=self.model_name)
+            res = gguf_engine.generate_completion(messages, tools)
             if not res.get("error"):
                 return res
 
-        # 2. Hybrid fallback to LiteLLM provider (Ollama / OpenAI / Anthropic / Gemini)
+        # 2. Ollama & Hybrid Provider Routing
         provider_model = self.model_name
         if not ("/" in provider_model or provider_model.startswith("ollama")):
             provider_model = f"ollama/{provider_model}"
@@ -35,7 +36,16 @@ class HybridLLMEngine:
         }
 
         if provider_model.startswith("ollama/"):
-            kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+            ollama_base = os.getenv("OLLAMA_API_BASE", "")
+            ollama_key = os.getenv("OLLAMA_API_KEY", "")
+            
+            if ollama_base:
+                kwargs["api_base"] = ollama_base
+            else:
+                kwargs["api_base"] = "http://localhost:11434"
+                
+            if ollama_key:
+                kwargs["api_key"] = ollama_key
 
         if tools:
             kwargs["tools"] = tools

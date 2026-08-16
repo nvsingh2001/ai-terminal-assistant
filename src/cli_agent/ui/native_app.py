@@ -89,25 +89,30 @@ class NativeCLIAgent:
 
         elif clean_cmd == '/model':
             console.print("[bold #38bdf8]Select LLM Provider / Model:[/bold #38bdf8]")
-            console.print("  1. ollama/gemma4:31b-cloud [Local Ollama]")
-            console.print("  2. ollama/qwen2.5-coder [Local Ollama]")
-            console.print("  3. gemini/gemini-1.5-flash [Google Gemini Cloud]")
-            console.print("  4. openai/gpt-4o-mini [OpenAI Cloud]")
+            console.print("  1. ollama/qwen3.5:4b [Local Ollama - Pulled]")
+            console.print("  2. Local llama.cpp GGUF file path (e.g. /path/to/model.gguf)")
+            console.print("  3. gemini/gemini-1.5-flash [Google Gemini Cloud API]")
+            console.print("  4. openai/gpt-4o-mini [OpenAI Cloud API]")
             console.print("  5. Custom model string")
             
             try:
                 choice = self.session.prompt("Enter choice (1-5) > ").strip()
                 new_model = ""
                 if choice == "1":
-                    new_model = "ollama/gemma4:31b-cloud"
+                    new_model = "ollama/qwen3.5:4b"
                 elif choice == "2":
-                    new_model = "ollama/qwen2.5-coder"
+                    gguf_path = self.session.prompt("Enter absolute path to your .gguf file > ").strip()
+                    if os.path.exists(gguf_path):
+                        new_model = gguf_path
+                    else:
+                        console.print(f"[bold #ef4444]File not found: {gguf_path}[/bold #ef4444]\n")
+                        return True
                 elif choice == "3":
                     new_model = "gemini/gemini-1.5-flash"
                 elif choice == "4":
                     new_model = "openai/gpt-4o-mini"
                 elif choice == "5":
-                    new_model = self.session.prompt("Enter model string (e.g. ollama/llama3.2) > ").strip()
+                    new_model = self.session.prompt("Enter model string or path (e.g. ollama/llama3.2 or /path/model.gguf) > ").strip()
 
                 if new_model:
                     config_manager.set_model(new_model)
