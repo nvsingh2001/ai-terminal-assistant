@@ -11,6 +11,7 @@ from textual import work
 from textual.worker import Worker, WorkerState
 
 from cli_agent.core.engine import DirectAgentEngine
+from cli_agent.core.config_manager import config_manager
 from cli_agent.services import (
     try_fast_path_execution, session_memory,
     get_system_info, get_env_context_string, history_manager
@@ -21,13 +22,11 @@ from cli_agent.ui.styles import APP_CSS
 from cli_agent.ui.components import UserMessage, RouterCard, ExecutionCard, SkillPaletteWidget
 
 
-from cli_agent.core.config_manager import config_manager
-
 class CLIAgentApp(App):
-    """A modern, elegant full-screen Slate/Obsidian Terminal UI for the AI CLI Agent."""
+    """OpenCode-Inspired Minimalist Full-Screen TUI for the AI CLI Agent."""
 
-    TITLE = "AI Command Line Agent"
-    SUB_TITLE = "Skill-Based Shell, File, Code & Git Automation"
+    TITLE = "CLI Agent"
+    SUB_TITLE = "OpenCode Minimalist AI Terminal"
     CSS = APP_CSS
 
     BINDINGS = [
@@ -53,22 +52,22 @@ class CLIAgentApp(App):
     def compose(self) -> ComposeResult:
         active_skills_count = len(skill_registry.list_skills())
         os_short = self.sys_info['os'].split()[0] if self.sys_info.get('os') else "Linux"
-        env_banner = f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  │  [dim #94a3b8]OS: {os_short}  │  Branch: {self.sys_info['git_branch']}  │  Skills: {active_skills_count}[/dim #94a3b8]  │  [bold #10b981]Status: Ready[/bold #10b981]"
-        yield Label(env_banner, id="header-info")
+        header_str = f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
+        yield Label(header_str, id="header-info")
         
         with ScrollableContainer(id="chat-container"):
-            yield Static(f"[dim #94a3b8]⚡ Skill-Based AI CLI Assistant Ready.\nType commands in plain English or press Ctrl+S for Skills Palette. Press Ctrl+D for Debug Logs.[/dim #94a3b8]")
+            yield Static(f"[dim #8b949e]● OpenCode AI Terminal Ready.\nType commands in plain English or press Ctrl+S for Skills Palette.[/dim #8b949e]")
             
         yield SkillPaletteWidget()
 
         with Container(id="spinner-container"):
             yield LoadingIndicator()
 
-        with Collapsible(title="Debug & Trace Logs (Ctrl+D)", collapsed=True, id="debug-drawer"):
+        with Collapsible(title="Debug Logs (Ctrl+D)", collapsed=True, id="debug-drawer"):
             yield Log(id="debug-log")
 
         with Container(id="input-container"):
-            yield Input(placeholder="User command > Enter your instruction here (Ctrl+S for skills)...", id="cmd-input")
+            yield Input(placeholder="❯ Enter prompt or command here... (Ctrl+S for skills)", id="cmd-input")
 
         yield Footer()
 
@@ -79,8 +78,8 @@ class CLIAgentApp(App):
         sys.stderr = StreamRedirector(log_widget, self.orig_stderr)
 
         try:
-            self.agent_crew = CLIAgentCrew()
-            log_widget.write_line(f"[SYSTEM] Skill-based Agent System Initialized. Env: {get_env_context_string()}")
+            self.agent_engine = DirectAgentEngine()
+            log_widget.write_line(f"[SYSTEM] Skill-based Direct Agent Engine Initialized. Env: {get_env_context_string()}")
         except Exception as e:
             log_widget.write_line(f"[ERROR] Failed to initialize Agent system: {str(e)}")
 
@@ -101,7 +100,8 @@ class CLIAgentApp(App):
             if new_model:
                 self.model_name = new_model
                 header_info = self.query_one("#header-info", Label)
-                header_info.update(f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  |  [dim #94a3b8]Model: {new_model}[/dim #94a3b8]  |  [bold #10b981]Status: Model Switched[/bold #10b981]")
+                active_skills_count = len(skill_registry.list_skills())
+                header_info.update(f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{new_model}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]")
         self.push_screen(ModelSelectorModal(), handle_model_selected)
 
     def action_clear_memory(self) -> None:
@@ -165,7 +165,8 @@ class CLIAgentApp(App):
         await chat_container.mount(UserMessage(user_text))
         chat_container.scroll_end(animate=False)
 
-        header_info.update(f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  |  [dim #94a3b8]Branch: {self.sys_info['git_branch']}[/dim #94a3b8]  |  [bold #f59e0b]Status: [1/2] Routing intent...[/bold #f59e0b]")
+        active_skills_count = len(skill_registry.list_skills())
+        header_info.update(f"[bold #d29922]●[/bold #d29922] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [bold #d29922]Processing...[/bold #d29922]")
         spinner.styles.display = "block"
 
         self.process_agent_task(user_text)
@@ -204,7 +205,7 @@ class CLIAgentApp(App):
 
             active_skills_count = len(skill_registry.list_skills())
             spinner.styles.display = "none"
-            header_info.update(f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  |  [dim #94a3b8]OS: {self.sys_info['os']}  |  Skills: {active_skills_count}[/dim #94a3b8]  |  [bold #10b981]Status: Ready[/bold #10b981]")
+            header_info.update(f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]")
 
             if data.get("routing"):
                 chat_container.mount(RouterCard(data["routing"]))

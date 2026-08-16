@@ -1,29 +1,32 @@
-"""Modern Slate / Obsidian Theme CSS stylesheets for the Textual TUI Application."""
+"""OpenCode-Inspired Minimalist Dark Theme CSS stylesheets for Textual TUI Application."""
 
 APP_CSS = """
 Screen {
-    background: #0f172a;
+    background: #0d1117;
     layout: vertical;
 }
 
 #header-info {
     height: 1;
-    background: #1e293b;
-    color: #f8fafc;
+    background: #161b22;
+    color: #f0f6fc;
     content-align: center middle;
+    text-align: center;
+    border-bottom: solid #30363d;
 }
 
 #chat-container {
     height: 1fr;
     padding: 1 2;
-    background: #0f172a;
+    background: #0d1117;
+    overflow-x: hidden;
 }
 
 #spinner-container {
-    height: 3;
+    height: 1;
     align: center middle;
     display: none;
-    background: #1e293b;
+    background: #161b22;
     color: #38bdf8;
 }
 
@@ -31,13 +34,14 @@ Screen {
     height: 3;
     padding: 0 1;
     margin: 0;
-    background: #1e293b;
+    background: #161b22;
+    border-top: solid #30363d;
 }
 
 #cmd-input {
-    border: tall #38bdf8;
-    background: #0f172a;
-    color: #f8fafc;
+    border: none;
+    background: #0d1117;
+    color: #f0f6fc;
     margin: 0;
 }
 
@@ -46,8 +50,8 @@ Screen {
     margin: 1;
     padding: 1;
     border: double #a855f7;
-    background: #1e293b;
-    color: #f8fafc;
+    background: #161b22;
+    color: #f0f6fc;
     display: none;
 }
 
@@ -55,14 +59,29 @@ Screen {
     height: auto;
     margin: 0;
     padding: 0;
-    border-top: solid #475569;
+    border-top: solid #30363d;
     overflow-x: hidden;
 }
 
 #debug-log {
     height: 10;
-    background: #020617;
-    color: #94a3b8;
+    background: #010409;
+    color: #8b949e;
     overflow-x: hidden;
+}
+
+.opencode-user {
+    margin: 1 0 0 0;
+    color: #38bdf8;
+}
+
+.opencode-router {
+    margin: 0 0 0 1;
+    color: #a855f7;
+}
+
+.opencode-execution {
+    margin: 1 0 1 1;
+    color: #7ee787;
 }
 """
