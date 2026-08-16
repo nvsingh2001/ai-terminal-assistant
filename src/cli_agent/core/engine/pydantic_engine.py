@@ -8,13 +8,14 @@ from cli_agent.core.interfaces.engine import IAgentEngine
 from cli_agent.core.llm.resolver import ModelResolver
 from cli_agent.skills.registry import SkillRegistry
 from cli_agent.services.memory_manager import ConversationMemory
+from cli_agent.memory.manager import TriTierMemoryManager, tri_tier_memory
 from cli_agent.services.env_detector import get_env_context_string
 
 class PydanticAgentEngine(IAgentEngine):
     """
     Type-Safe Agent Engine powered by PydanticAI (Strategy Pattern implementation).
     Provides native function tool validation, multi-turn reasoning loops,
-    real-time execution trace callbacks, and unified execution across LLM providers.
+    real-time execution trace callbacks, and integrated Tri-Tier Long-Term Memory.
     """
     def __init__(
         self,
@@ -22,14 +23,17 @@ class PydanticAgentEngine(IAgentEngine):
         skill_registry: SkillRegistry,
         memory_store: ConversationMemory,
         model_resolver: Optional[ModelResolver] = None,
+        long_term_memory: Optional[TriTierMemoryManager] = None,
         verbose: bool = False
     ):
         self.model_name = model_name
         self.skill_registry = skill_registry
         self.memory_store = memory_store
         self.model_resolver = model_resolver or ModelResolver()
+        self.long_term_memory = long_term_memory or tri_tier_memory
         self.verbose = verbose
         self.trace_callback: Optional[Callable[[str, Any], None]] = None
+        self._tools_invoked_in_turn: List[str] = []
         self._rebuild_agent()
 
     def set_model(self, model_name: str):
@@ -53,23 +57,34 @@ class PydanticAgentEngine(IAgentEngine):
             except Exception:
                 pass
 
-    def _rebuild_agent(self):
-        """Builds the configured PydanticAI Agent with typed tool bindings and model settings."""
+    def _rebuild_agent(self, user_query: Optional[str] = None):
+        """Builds the configured PydanticAI Agent with typed tool bindings and memory context."""
         pydantic_model = self.model_resolver.resolve_model(self.model_name)
         
         env_ctx = get_env_context_string()
-        history_ctx = self.memory_store.get_formatted_context()
+        session_ctx = self.memory_store.get_formatted_context()
+        long_term_ctx = self.long_term_memory.get_formatted_prompt_memory(user_query) if self.long_term_memory else ""
 
-        system_prompt = (
-            "You are an expert AI Command Line Assistant operating directly in the user's terminal.\n"
-            f"Environment Context: {env_ctx}\n"
-            f"Prior Conversation Memory:\n{history_ctx}\n\n"
+        prompt_parts = [
+            "You are an expert AI Command Line Assistant operating directly in the user's terminal.",
+            f"Environment Context: {env_ctx}"
+        ]
+
+        if long_term_ctx:
+            prompt_parts.append(f"Long-Term Memory & Project Knowledge:\n{long_term_ctx}")
+
+        if session_ctx and session_ctx != "No prior conversation history.":
+            prompt_parts.append(f"Current Session Conversation:\n{session_ctx}")
+
+        prompt_parts.append(
             "Guidelines for tool usage:\n"
-            "1. Use `shell_execution` to run terminal commands. On Linux/macOS, commands run in bash.\n"
-            "2. When invoking virtual environments or python, execute `./venv/bin/python <script>` or `python3 <script>` (do not attempt to execute non-executable activate scripts directly).\n"
+            "1. Use `shell_execution` to run terminal commands in bash.\n"
+            "2. When invoking python in a virtualenv, execute `./venv/bin/python <script>` or `python3 <script>`.\n"
             "3. Use `file_management`, `code_editing`, and `git_operations` as appropriate.\n"
-            "4. Format your final answers cleanly in Markdown without echoing raw tool calls."
+            "4. Format final answers cleanly in Markdown."
         )
+
+        system_prompt = "\n\n".join(prompt_parts)
 
         self._agent = Agent(
             pydantic_model,
@@ -81,6 +96,7 @@ class PydanticAgentEngine(IAgentEngine):
         @self._agent.tool_plain
         def shell_execution(command: str) -> str:
             """Executes a bash shell command on the host terminal."""
+            self._tools_invoked_in_turn.append("shell_execution")
             self._emit_trace("tool_call", {"tool": "shell_execution", "args": {"command": command}})
             res = self.skill_registry.execute("shell_execution", command=command)
             self._emit_trace("tool_result", {"tool": "shell_execution", "output": res})
@@ -96,6 +112,7 @@ class PydanticAgentEngine(IAgentEngine):
             query: Optional[str] = None
         ) -> str:
             """Manages files and directories (actions: read, write, list, search, delete, info)."""
+            self._tools_invoked_in_turn.append("file_management")
             args = {"action": action, "path": path, "content": content, "recursive": recursive, "query": query}
             clean_args = {k: v for k, v in args.items() if v is not None}
             self._emit_trace("tool_call", {"tool": "file_management", "args": clean_args})
@@ -120,6 +137,7 @@ class PydanticAgentEngine(IAgentEngine):
             line_number: Optional[int] = None
         ) -> str:
             """Edits code files with exact string replacement or line insertions."""
+            self._tools_invoked_in_turn.append("code_editing")
             args = {"file_path": file_path, "action": action, "old_string": old_string, "new_string": new_string, "line_number": line_number}
             clean_args = {k: v for k, v in args.items() if v is not None}
             self._emit_trace("tool_call", {"tool": "code_editing", "args": clean_args})
@@ -142,6 +160,7 @@ class PydanticAgentEngine(IAgentEngine):
             commit_message: Optional[str] = None
         ) -> str:
             """Performs git operations (actions: status, diff, commit, log, branch)."""
+            self._tools_invoked_in_turn.append("git_operations")
             args = {"action": action, "branch_name": branch_name, "commit_message": commit_message}
             clean_args = {k: v for k, v in args.items() if v is not None}
             self._emit_trace("tool_call", {"tool": "git_operations", "args": clean_args})
@@ -156,13 +175,14 @@ class PydanticAgentEngine(IAgentEngine):
 
     def run_task(self, user_request: str) -> Dict[str, str]:
         """
-        Executes user request through PydanticAI Agent with multi-turn tool calling and trace extraction.
+        Executes user request through PydanticAI Agent with multi-turn tool calling and memory persistence.
         """
+        self._tools_invoked_in_turn = []
         skills_count = len(self.skill_registry.list_skills())
-        routing_summary = f"**[PydanticAI Engine]** Type-safe multi-turn execution with {skills_count} registered skills."
+        routing_summary = f"**[PydanticAI Engine]** Type-safe execution with {skills_count} skills & Tri-Tier Memory."
 
         try:
-            self._rebuild_agent()
+            self._rebuild_agent(user_query=user_request)
             result = self._agent.run_sync(user_request)
             
             # Extract any thinking parts from all messages
@@ -179,7 +199,18 @@ class PydanticAgentEngine(IAgentEngine):
             if not output_text:
                 output_text = "Task completed successfully."
 
+            # Update Short-Term Session Memory
             self.memory_store.add_turn(user_request, "PydanticAI", output_text)
+
+            # Persist to Tier 3 Episodic Long-Term Memory
+            if self.long_term_memory and len(user_request) > 3:
+                tools_used = list(dict.fromkeys(self._tools_invoked_in_turn))
+                self.long_term_memory.record_episode(
+                    user_prompt=user_request,
+                    solution_summary=output_text[:300],
+                    tools_used=tools_used
+                )
+
             return {
                 "routing": routing_summary,
                 "execution": output_text,

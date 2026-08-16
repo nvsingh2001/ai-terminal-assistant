@@ -29,7 +29,7 @@ class NativeCLIAgent:
     """
     Next-Gen Box-Free & Card-Free Native Terminal Interface.
     Architected with clean Dependency Injection, Command Pattern, and PydanticAI.
-    Supports real-time thinking and tool execution trace visualization (/verbose).
+    Supports real-time thinking, tool execution trace (/verbose), and Tri-Tier Long-Term Memory (/memory).
     """
 
     def __init__(self):
@@ -39,7 +39,10 @@ class NativeCLIAgent:
         # Initialize PromptSession
         self.session = PromptSession(
             history=FileHistory(HISTORY_FILE),
-            completer=WordCompleter(['/model', '/skills', '/verbose', '/trace', '/clear', '/help', '/exit', '/quit'])
+            completer=WordCompleter([
+                '/model', '/skills', '/memory', '/remember', '/forget',
+                '/verbose', '/trace', '/clear', '/help', '/exit', '/quit'
+            ])
         )
 
         # Wire all dependencies through DI Container
@@ -86,11 +89,12 @@ class NativeCLIAgent:
         active_skills_count = len(self.container.skill_registry.list_skills())
         branch = self.sys_info.get('git_branch', 'main')
         trace_status = "[bold #10b981]ON[/bold #10b981]" if self.verbose_enabled else "[dim #64748b]OFF[/dim #64748b]"
+        proj_id = self.container.tri_tier_memory.project_id
         
         console.print()
         console.print(f"[bold #10b981]✦ AI COMMAND LINE AGENT[/bold #10b981] [dim #94a3b8]v2.0[/dim #94a3b8]")
         console.print(f"  [dim #94a3b8]Model:[/dim #94a3b8] [bold #38bdf8]{self.model_name}[/bold #38bdf8]  │  [dim #94a3b8]Branch:[/dim #94a3b8] [dim #f8fafc]{branch}[/dim #f8fafc]  │  [dim #94a3b8]Skills:[/dim #94a3b8] [bold #a855f7]{active_skills_count} loaded[/bold #a855f7]  │  [dim #94a3b8]Trace:[/dim #94a3b8] {trace_status}")
-        console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b], [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models, [/dim #64748b][bold #38bdf8]/verbose[/bold #38bdf8][dim #64748b] to toggle trace.[/dim #64748b]")
+        console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b], [/dim #64748b][bold #38bdf8]/memory[/bold #38bdf8][dim #64748b] for long-term facts, [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models.[/dim #64748b]")
         console.print()
 
     def execute_request(self, user_request: str):
@@ -109,7 +113,7 @@ class NativeCLIAgent:
 
         # PydanticAI Agent execution
         if self.verbose_enabled:
-            console.print(f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]**[PydanticAI Engine]** Trace mode active[/dim #94a3b8]\n")
+            console.print(f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]**[PydanticAI Engine]** Trace mode active with Long-Term Memory[/dim #94a3b8]\n")
             res = self.container.engine.run_task(req_clean)
         else:
             with Live(Spinner("dots", text="[bold #38bdf8]Thinking & Executing...[/bold #38bdf8]"), console=console, transient=True):
@@ -143,7 +147,7 @@ class NativeCLIAgent:
                     continue
 
                 # Delegate slash commands to CommandDispatcher
-                if user_input.startswith('/') or user_input.lower() in ['exit', 'quit', 'clear', 'help', 'verbose', 'trace']:
+                if user_input.startswith('/') or user_input.lower() in ['exit', 'quit', 'clear', 'help', 'verbose', 'trace', 'memory', 'remember']:
                     if self.container.dispatcher.dispatch(user_input):
                         continue
 

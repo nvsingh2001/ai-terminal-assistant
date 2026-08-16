@@ -4,6 +4,7 @@ from typing import Any
 from cli_agent.core.config_manager import ConfigManager, config_manager
 from cli_agent.skills.registry import SkillRegistry, skill_registry
 from cli_agent.services.memory_manager import ConversationMemory, session_memory
+from cli_agent.memory.manager import TriTierMemoryManager, tri_tier_memory
 from cli_agent.core.engine.pydantic_engine import PydanticAgentEngine
 from cli_agent.commands.base import CommandContext
 from cli_agent.commands.dispatcher import CommandDispatcher
@@ -13,16 +14,20 @@ from cli_agent.commands.clear_cmd import ClearCommand
 from cli_agent.commands.help_cmd import HelpCommand
 from cli_agent.commands.exit_cmd import ExitCommand
 from cli_agent.commands.verbose_cmd import VerboseCommand
+from cli_agent.commands.memory_cmd import MemoryCommand
+from cli_agent.commands.remember_cmd import RememberCommand
+from cli_agent.commands.forget_cmd import ForgetCommand
 
 @dataclass
 class ServiceContainer:
     """
     Dependency Injection Container.
-    Assembles and manages life cycles of core services, engines, and command dispatchers.
+    Assembles and manages life cycles of core services, engines, long-term memory, and command dispatchers.
     """
     config_manager: ConfigManager
     skill_registry: SkillRegistry
     memory_store: ConversationMemory
+    tri_tier_memory: TriTierMemoryManager
     engine: PydanticAgentEngine
     dispatcher: CommandDispatcher
 
@@ -32,12 +37,14 @@ class ServiceContainer:
         cfg = config_manager
         skills = skill_registry
         mem = session_memory
+        lt_mem = tri_tier_memory
 
-        # Instantiate PydanticAgentEngine with configured verbose mode
+        # Instantiate PydanticAgentEngine with configured verbose mode & long-term memory
         engine = PydanticAgentEngine(
             model_name=cfg.config.model_name,
             skill_registry=skills,
             memory_store=mem,
+            long_term_memory=lt_mem,
             verbose=cfg.config.verbose
         )
 
@@ -48,13 +55,17 @@ class ServiceContainer:
             skill_registry=skills,
             memory_store=mem,
             console=console,
-            engine=engine
+            engine=engine,
+            tri_tier_memory=lt_mem
         )
 
         # Instantiate and register Command Dispatcher
         dispatcher = CommandDispatcher(ctx)
         dispatcher.register(ModelCommand())
         dispatcher.register(SkillsCommand())
+        dispatcher.register(MemoryCommand())
+        dispatcher.register(RememberCommand())
+        dispatcher.register(ForgetCommand())
         dispatcher.register(VerboseCommand())
         dispatcher.register(ClearCommand())
         dispatcher.register(HelpCommand())
@@ -64,6 +75,7 @@ class ServiceContainer:
             config_manager=cfg,
             skill_registry=skills,
             memory_store=mem,
+            tri_tier_memory=lt_mem,
             engine=engine,
             dispatcher=dispatcher
         )

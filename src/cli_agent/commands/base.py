@@ -11,6 +11,7 @@ class CommandContext:
     memory_store: Any
     console: Any
     engine: Optional[Any] = None
+    tri_tier_memory: Optional[Any] = None
 
 class ISlashCommand(ABC):
     """Command Pattern interface for all interactive terminal slash commands."""
@@ -26,6 +27,11 @@ class ISlashCommand(ABC):
     def description(self) -> str:
         """Command summary shown in help palette."""
         pass
+
+    @property
+    def aliases(self) -> list[str]:
+        """Optional list of command aliases."""
+        return []
 
     @abstractmethod
     def execute(self, context: CommandContext, raw_args: str = "") -> bool:
