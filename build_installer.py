@@ -45,8 +45,13 @@ def build():
         "--collect-all", "prompt_toolkit",
         "--collect-all", "rich",
         "--collect-all", "pydantic_ai",
+        "--collect-all", "pydantic_ai_slim",
         "--collect-all", "pydantic_core",
         "--collect-all", "pydantic",
+        "--collect-all", "genai_prices",
+        "--copy-metadata", "genai_prices",
+        "--copy-metadata", "pydantic_ai",
+        "--copy-metadata", "pydantic_ai_slim",
         *exclude_args,
         entrypoint
     ]
