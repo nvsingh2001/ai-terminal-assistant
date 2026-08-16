@@ -7,9 +7,8 @@ def build():
     print("=== BUILDING CLI-AGENT STANDALONE BINARY ===")
     
     root_dir = os.path.dirname(os.path.abspath(__file__))
-    backend_dir = os.path.join(root_dir, "backend")
-    entrypoint = os.path.join(backend_dir, "run.py")
-    config_dir = os.path.join(backend_dir, "src", "cli_agent", "config")
+    entrypoint = os.path.join(root_dir, "run.py")
+    config_dir = os.path.join(root_dir, "src", "cli_agent", "config")
     
     # Path separator for PyInstaller --add-data (';' on Windows, ':' on Unix)
     sep = ";" if sys.platform == "win32" else ":"
@@ -17,7 +16,7 @@ def build():
     
     binary_name = "cli-agent"
     
-    src_dir = os.path.join(backend_dir, "src")
+    src_dir = os.path.join(root_dir, "src")
     
     # Use project virtual environment python if available to avoid packing heavy global ML packages (torch, scipy, pandas)
     venv_python = os.path.join(root_dir, "venv", "Scripts", "python.exe") if sys.platform == "win32" else os.path.join(root_dir, "venv", "bin", "python")
@@ -38,8 +37,10 @@ def build():
         "--name", binary_name,
         "--paths", src_dir,
         "--add-data", data_arg,
-        "--collect-all", "crewai",
-        "--collect-all", "crewai_tools",
+        "--collect-all", "litellm",
+        "--collect-all", "textual",
+        "--collect-all", "tiktoken",
+        "--collect-all", "tiktoken_ext",
         *exclude_args,
         entrypoint
     ]
