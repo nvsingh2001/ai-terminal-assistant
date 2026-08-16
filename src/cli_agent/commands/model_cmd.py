@@ -18,31 +18,37 @@ class ModelCommand(ISlashCommand):
         cfg = context.config_manager
 
         console.print("[bold #38bdf8]Select LLM Provider / Model:[/bold #38bdf8]")
-        console.print("  1. ollama/qwen3.5:4b [Local Ollama - Fast]")
-        console.print("  2. ollama/gemma4:31b-cloud [Ollama Cloud]")
-        console.print("  3. gemini/gemini-1.5-flash [Google Gemini Cloud API]")
-        console.print("  4. openai/gpt-4o-mini [OpenAI Cloud API]")
-        console.print("  5. anthropic/claude-3-5-sonnet [Anthropic Cloud API]")
-        console.print("  6. Local llama.cpp GGUF file path (e.g. /path/to/model.gguf)")
-        console.print("  7. Custom model string")
+        console.print("  1. ollama/nemotron-3-ultra [NVIDIA Ultra Deep Logic - Cloud]")
+        console.print("  2. ollama/gpt-oss:120b [OpenAI OSS 120B Flagship - Cloud]")
+        console.print("  3. ollama/gemma4:31b [Google Gemma 31B Fast - Cloud]")
+        console.print("  4. ollama/qwen3.5:4b [Local Ollama - Fast]")
+        console.print("  5. gemini/gemini-2.0-flash [Google Gemini Cloud API - Free]")
+        console.print("  6. openai/gpt-4o-mini [OpenAI Cloud API]")
+        console.print("  7. anthropic/claude-3-5-sonnet [Anthropic Cloud API]")
+        console.print("  8. Local llama.cpp GGUF file path (e.g. /path/to/model.gguf)")
+        console.print("  9. Custom model string")
 
         try:
-            choice = session.prompt("Enter choice (1-7) > ").strip()
+            choice = session.prompt("Enter choice (1-9) > ").strip()
             new_model = ""
 
             if choice == "1":
-                new_model = "ollama/qwen3.5:4b"
+                new_model = "ollama/nemotron-3-ultra"
             elif choice == "2":
-                new_model = "ollama/gemma4:31b-cloud"
+                new_model = "ollama/gpt-oss:120b"
             elif choice == "3":
-                new_model = "gemini/gemini-1.5-flash"
+                new_model = "ollama/gemma4:31b"
+            elif choice == "4":
+                new_model = "ollama/qwen3.5:4b"
+            elif choice == "5":
+                new_model = "gemini/gemini-2.0-flash"
                 if not os.getenv("GEMINI_API_KEY"):
                     key = session.prompt("Enter GEMINI_API_KEY > ").strip()
                     if key:
                         os.environ["GEMINI_API_KEY"] = key
                         cfg.config.api_keys["gemini"] = key
                         cfg.save_config(cfg.config)
-            elif choice == "4":
+            elif choice == "6":
                 new_model = "openai/gpt-4o-mini"
                 if not os.getenv("OPENAI_API_KEY"):
                     key = session.prompt("Enter OPENAI_API_KEY > ").strip()
@@ -50,7 +56,7 @@ class ModelCommand(ISlashCommand):
                         os.environ["OPENAI_API_KEY"] = key
                         cfg.config.api_keys["openai"] = key
                         cfg.save_config(cfg.config)
-            elif choice == "5":
+            elif choice == "7":
                 new_model = "anthropic/claude-3-5-sonnet"
                 if not os.getenv("ANTHROPIC_API_KEY"):
                     key = session.prompt("Enter ANTHROPIC_API_KEY > ").strip()
@@ -58,15 +64,15 @@ class ModelCommand(ISlashCommand):
                         os.environ["ANTHROPIC_API_KEY"] = key
                         cfg.config.api_keys["anthropic"] = key
                         cfg.save_config(cfg.config)
-            elif choice == "6":
+            elif choice == "8":
                 gguf_path = session.prompt("Enter absolute path to your .gguf file > ").strip()
                 if os.path.exists(gguf_path):
                     new_model = gguf_path
                 else:
                     console.print(f"[bold #ef4444]File not found: {gguf_path}[/bold #ef4444]\n")
                     return True
-            elif choice == "7":
-                new_model = session.prompt("Enter model string (e.g. ollama/llama3.2) > ").strip()
+            elif choice == "9":
+                new_model = session.prompt("Enter model string (e.g. ollama/qwen2.5-coder:32b) > ").strip()
 
             if new_model:
                 cfg.set_model(new_model)
