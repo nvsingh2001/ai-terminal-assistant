@@ -1,7 +1,7 @@
 import os
 import json
 from typing import Dict, Any, List, Optional
-from pydantic_ai import Agent
+from pydantic_ai import Agent, ModelSettings
 
 from cli_agent.core.interfaces.engine import IAgentEngine
 from cli_agent.core.llm.resolver import ModelResolver
@@ -34,8 +34,8 @@ class PydanticAgentEngine(IAgentEngine):
         self._rebuild_agent()
 
     def _rebuild_agent(self):
-        """Builds the configured PydanticAI Agent with typed tool bindings."""
-        pydantic_model_string = self.model_resolver.resolve_model_string(self.model_name)
+        """Builds the configured PydanticAI Agent with typed tool bindings and model settings."""
+        pydantic_model = self.model_resolver.resolve_model(self.model_name)
         
         env_ctx = get_env_context_string()
         history_ctx = self.memory_store.get_formatted_context()
@@ -48,7 +48,11 @@ class PydanticAgentEngine(IAgentEngine):
             "Never execute destructive actions without user intent. Keep final answers concise and formatted in Markdown."
         )
 
-        self._agent = Agent(pydantic_model_string, system_prompt=system_prompt)
+        self._agent = Agent(
+            pydantic_model,
+            system_prompt=system_prompt,
+            model_settings=ModelSettings(max_tokens=4096)
+        )
 
         # Register Tool 1: Shell Execution
         @self._agent.tool_plain
@@ -117,7 +121,6 @@ class PydanticAgentEngine(IAgentEngine):
         routing_summary = f"**[PydanticAI Engine]** Type-safe multi-turn execution with {skills_count} registered skills."
 
         try:
-            # Rebuild agent to ensure fresh system prompt with current working directory & history
             self._rebuild_agent()
             result = self._agent.run_sync(user_request)
             output_text = str(result.output or "").strip()
@@ -136,10 +139,10 @@ class PydanticAgentEngine(IAgentEngine):
             if "404" in err_str or "not found" in err_str:
                 return {
                     "routing": "Model Provider Notice",
-                    "execution": f"Model '{self.model_name}' was not found.\n\n"
+                    "execution": f"Model '{self.model_name}' was not found on Ollama.\n\n"
                                  f"👉 **Action Required**:\n"
                                  f"1. Pull the model: `ollama pull {self.model_name.replace('ollama/', '')}`\n"
-                                 f"2. Or switch models via `/model` command."
+                                 f"2. Or switch models via `/model` command (e.g. `ollama/gemma4:31b-cloud`)."
                 }
             return {
                 "routing": "Execution Notice",
