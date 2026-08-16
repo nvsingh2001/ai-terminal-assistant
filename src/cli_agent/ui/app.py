@@ -216,5 +216,6 @@ class CLIAgentApp(App):
 
 
 def run_tui():
-    app = CLIAgentApp()
-    app.run()
+    """Launches the Box-Free Native Terminal Engine."""
+    from cli_agent.ui.native_app import run_native_app
+    run_native_app()
