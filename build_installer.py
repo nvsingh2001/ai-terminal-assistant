@@ -44,6 +44,9 @@ def build():
         "--collect-all", "tiktoken_ext",
         "--collect-all", "prompt_toolkit",
         "--collect-all", "rich",
+        "--collect-all", "pydantic_ai",
+        "--collect-all", "pydantic_core",
+        "--collect-all", "pydantic",
         *exclude_args,
         entrypoint
     ]
