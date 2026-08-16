@@ -5,6 +5,7 @@ from cli_agent.commands.skills_cmd import SkillsCommand
 from cli_agent.commands.clear_cmd import ClearCommand
 from cli_agent.commands.help_cmd import HelpCommand
 from cli_agent.commands.exit_cmd import ExitCommand
+from cli_agent.commands.verbose_cmd import VerboseCommand
 
 __all__ = [
     "ISlashCommand",
@@ -14,5 +15,6 @@ __all__ = [
     "SkillsCommand",
     "ClearCommand",
     "HelpCommand",
-    "ExitCommand"
+    "ExitCommand",
+    "VerboseCommand"
 ]

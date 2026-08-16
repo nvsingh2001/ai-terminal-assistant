@@ -1,6 +1,6 @@
 import sys
 import os
-from typing import Optional
+from typing import Optional, Any
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -29,6 +29,7 @@ class NativeCLIAgent:
     """
     Next-Gen Box-Free & Card-Free Native Terminal Interface.
     Architected with clean Dependency Injection, Command Pattern, and PydanticAI.
+    Supports real-time thinking and tool execution trace visualization (/verbose).
     """
 
     def __init__(self):
@@ -38,7 +39,7 @@ class NativeCLIAgent:
         # Initialize PromptSession
         self.session = PromptSession(
             history=FileHistory(HISTORY_FILE),
-            completer=WordCompleter(['/model', '/skills', '/clear', '/help', '/exit', '/quit'])
+            completer=WordCompleter(['/model', '/skills', '/verbose', '/trace', '/clear', '/help', '/exit', '/quit'])
         )
 
         # Wire all dependencies through DI Container
@@ -47,6 +48,9 @@ class NativeCLIAgent:
             prompt_session=self.session
         )
 
+        # Connect real-time trace callback for live thinking & tool invocation inspection
+        self.container.engine.set_trace_callback(self._handle_trace_event)
+
         # Update completer with all registered commands and aliases
         self.session.completer = WordCompleter(self.container.dispatcher.get_command_names())
 
@@ -54,15 +58,39 @@ class NativeCLIAgent:
     def model_name(self) -> str:
         return self.container.config_manager.config.model_name
 
+    @property
+    def verbose_enabled(self) -> bool:
+        return self.container.config_manager.config.verbose
+
+    def _handle_trace_event(self, event_type: str, data: Any):
+        """Displays real-time thinking and tool execution steps when verbose mode is active."""
+        if not self.verbose_enabled:
+            return
+
+        if event_type == "thinking":
+            console.print(f"[bold #a78bfa]💭 Thinking:[/bold #a78bfa] [dim italic #e2e8f0]{data}[/dim italic #e2e8f0]\n")
+
+        elif event_type == "tool_call":
+            tool_name = data.get("tool", "tool")
+            args = data.get("args", {})
+            args_str = ", ".join(f"{k}={repr(v)}" for k, v in args.items())
+            console.print(f"[bold #38bdf8]⚙ Executing:[/bold #38bdf8] [bold yellow]{tool_name}[/bold yellow]([dim #94a3b8]{args_str}[/dim #94a3b8])")
+
+        elif event_type == "tool_result":
+            output = str(data.get("output", "")).strip()
+            preview = output[:300].replace("\n", " ") + ("..." if len(output) > 300 else "")
+            console.print(f"  [dim #94a3b8]↳ Result: {preview}[/dim #94a3b8]\n")
+
     def print_header(self):
-        """Displays minimalist 1-line startup banner."""
+        """Displays minimalist 1-line startup banner with trace status."""
         active_skills_count = len(self.container.skill_registry.list_skills())
         branch = self.sys_info.get('git_branch', 'main')
+        trace_status = "[bold #10b981]ON[/bold #10b981]" if self.verbose_enabled else "[dim #64748b]OFF[/dim #64748b]"
         
         console.print()
         console.print(f"[bold #10b981]✦ AI COMMAND LINE AGENT[/bold #10b981] [dim #94a3b8]v2.0[/dim #94a3b8]")
-        console.print(f"  [dim #94a3b8]Model:[/dim #94a3b8] [bold #38bdf8]{self.model_name}[/bold #38bdf8]  │  [dim #94a3b8]Branch:[/dim #94a3b8] [dim #f8fafc]{branch}[/dim #f8fafc]  │  [dim #94a3b8]Skills:[/dim #94a3b8] [bold #a855f7]{active_skills_count} loaded[/bold #a855f7]")
-        console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b] for slash commands, [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models, [/dim #64748b][bold #38bdf8]/skills[/bold #38bdf8][dim #64748b] for palette.[/dim #64748b]")
+        console.print(f"  [dim #94a3b8]Model:[/dim #94a3b8] [bold #38bdf8]{self.model_name}[/bold #38bdf8]  │  [dim #94a3b8]Branch:[/dim #94a3b8] [dim #f8fafc]{branch}[/dim #f8fafc]  │  [dim #94a3b8]Skills:[/dim #94a3b8] [bold #a855f7]{active_skills_count} loaded[/bold #a855f7]  │  [dim #94a3b8]Trace:[/dim #94a3b8] {trace_status}")
+        console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b], [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models, [/dim #64748b][bold #38bdf8]/verbose[/bold #38bdf8][dim #64748b] to toggle trace.[/dim #64748b]")
         console.print()
 
     def execute_request(self, user_request: str):
@@ -79,14 +107,17 @@ class NativeCLIAgent:
             console.print()
             return
 
-        # PydanticAI Agent execution with live spinner
-        with Live(Spinner("dots", text="[bold #38bdf8]Thinking & Executing...[/bold #38bdf8]"), console=console, transient=True):
+        # PydanticAI Agent execution
+        if self.verbose_enabled:
+            console.print(f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]**[PydanticAI Engine]** Trace mode active[/dim #94a3b8]\n")
             res = self.container.engine.run_task(req_clean)
+        else:
+            with Live(Spinner("dots", text="[bold #38bdf8]Thinking & Executing...[/bold #38bdf8]"), console=console, transient=True):
+                res = self.container.engine.run_task(req_clean)
+            routing_info = res.get("routing", "PydanticAI Routing")
+            console.print(f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]{routing_info}[/dim #94a3b8]\n")
 
-        routing_info = res.get("routing", "PydanticAI Routing")
         exec_output = res.get("execution", "")
-
-        console.print(f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]{routing_info}[/dim #94a3b8]\n")
         self._render_output(exec_output)
         console.print()
 
@@ -112,7 +143,7 @@ class NativeCLIAgent:
                     continue
 
                 # Delegate slash commands to CommandDispatcher
-                if user_input.startswith('/') or user_input.lower() in ['exit', 'quit', 'clear', 'help']:
+                if user_input.startswith('/') or user_input.lower() in ['exit', 'quit', 'clear', 'help', 'verbose', 'trace']:
                     if self.container.dispatcher.dispatch(user_input):
                         continue
 

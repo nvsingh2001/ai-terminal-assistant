@@ -12,6 +12,7 @@ from cli_agent.commands.skills_cmd import SkillsCommand
 from cli_agent.commands.clear_cmd import ClearCommand
 from cli_agent.commands.help_cmd import HelpCommand
 from cli_agent.commands.exit_cmd import ExitCommand
+from cli_agent.commands.verbose_cmd import VerboseCommand
 
 @dataclass
 class ServiceContainer:
@@ -32,11 +33,12 @@ class ServiceContainer:
         skills = skill_registry
         mem = session_memory
 
-        # Instantiate PydanticAgentEngine
+        # Instantiate PydanticAgentEngine with configured verbose mode
         engine = PydanticAgentEngine(
             model_name=cfg.config.model_name,
             skill_registry=skills,
-            memory_store=mem
+            memory_store=mem,
+            verbose=cfg.config.verbose
         )
 
         # Create Command Context
@@ -53,6 +55,7 @@ class ServiceContainer:
         dispatcher = CommandDispatcher(ctx)
         dispatcher.register(ModelCommand())
         dispatcher.register(SkillsCommand())
+        dispatcher.register(VerboseCommand())
         dispatcher.register(ClearCommand())
         dispatcher.register(HelpCommand())
         dispatcher.register(ExitCommand())

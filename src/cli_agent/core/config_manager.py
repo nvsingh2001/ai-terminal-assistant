@@ -44,6 +44,7 @@ class AgentConfig:
     model_name: str = ""
     provider: str = "auto"
     llama_cpp_model_path: str = ""
+    verbose: bool = False
     temperature: float = 0.1
     max_tokens: int = 4096
     api_keys: Dict[str, str] = None
@@ -99,6 +100,11 @@ class ConfigManager:
     def set_model(self, model_name: str):
         """Updates and persists selected model."""
         self.config.model_name = model_name
+        self.save_config(self.config)
+
+    def set_verbose(self, verbose: bool):
+        """Updates and persists verbose/trace mode."""
+        self.config.verbose = verbose
         self.save_config(self.config)
 
 
