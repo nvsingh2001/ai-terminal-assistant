@@ -72,7 +72,20 @@ class HybridLLMEngine:
 
         # 5. Execute via LiteLLM
         try:
-            return litellm.completion(**kwargs)
+            res = litellm.completion(**kwargs)
+            
+            # If tools were passed but model returned empty content and no tool calls,
+            # retry without tools to get a full natural language response.
+            if tools and hasattr(res, "choices") and res.choices:
+                msg = res.choices[0].message
+                content = (getattr(msg, "content", "") or "").strip()
+                tool_calls = getattr(msg, "tool_calls", None)
+                if not content and not tool_calls:
+                    kwargs.pop("tools", None)
+                    kwargs.pop("tool_choice", None)
+                    return litellm.completion(**kwargs)
+
+            return res
         except Exception as e:
             err_str = str(e)
 
