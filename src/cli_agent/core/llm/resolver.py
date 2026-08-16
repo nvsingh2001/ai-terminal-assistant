@@ -1,30 +1,33 @@
 import os
 import requests
-from typing import Any, Union
+from typing import Any
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.ollama import OllamaProvider
 from cli_agent.core.interfaces.model import IModelResolver
 
 class ModelResolver(IModelResolver):
     """
     Translates user model configurations into Model instances compatible with PydanticAI.
-    Ensures Ollama connects to localhost:11434/v1 with direct OllamaProvider.
+    Smart-routes between local Ollama (if pulled locally) and Ollama Cloud / remote endpoints.
     """
-    def _get_ollama_base(self) -> str:
-        """Determines reachable Ollama base URL with /v1 suffix."""
-        local_base = "http://localhost:11434"
-        remote_base = os.getenv("OLLAMA_API_BASE", "")
-
+    def _is_locally_installed(self, model_tag: str) -> bool:
+        """Checks if a model is installed in the local Ollama instance."""
         try:
-            requests.get(f"{local_base}/api/tags", timeout=2)
-            chosen_base = local_base
+            r = requests.get("http://localhost:11434/api/tags", timeout=1)
+            if r.status_code == 200:
+                installed = r.json().get("models", [])
+                installed_names = [m.get("name", "").lower() for m in installed]
+                tag_lower = model_tag.lower()
+                if tag_lower in installed_names or f"{tag_lower}:latest" in installed_names:
+                    return True
+                # Check base name prefix
+                base_names = [name.split(":")[0] for name in installed_names]
+                if tag_lower.split(":")[0] in base_names:
+                    return True
         except Exception:
-            chosen_base = remote_base if remote_base else local_base
-
-        if not chosen_base.endswith("/v1"):
-            chosen_base = f"{chosen_base.rstrip('/')}/v1"
-
-        return chosen_base
+            pass
+        return False
 
     def resolve_model(self, model_name: str) -> Any:
         """Returns configured PydanticAI Model instance or model string."""
@@ -39,16 +42,21 @@ class ModelResolver(IModelResolver):
         elif clean.startswith("anthropic/"):
             return f"anthropic:{clean.split('/', 1)[1]}"
 
-        elif clean.startswith("ollama/"):
-            model_tag = clean.replace("ollama/", "")
-            base_url = self._get_ollama_base()
-            provider = OllamaProvider(base_url=base_url)
-            return OpenAIChatModel(model_tag, provider=provider)
-
         else:
-            base_url = self._get_ollama_base()
-            provider = OllamaProvider(base_url=base_url)
-            return OpenAIChatModel(clean, provider=provider)
+            model_tag = clean.replace("ollama/", "")
+            
+            # If the model is pulled locally in localhost:11434, use local OllamaProvider
+            if self._is_locally_installed(model_tag):
+                provider = OllamaProvider(base_url="http://localhost:11434/v1")
+                return OpenAIChatModel(model_tag, provider=provider)
+            
+            # Otherwise, route to Ollama Cloud / Remote API Base with auth key
+            remote_base = os.getenv("OLLAMA_API_BASE", "https://ollama.com/v1").rstrip("/")
+            if not remote_base.endswith("/v1"):
+                remote_base = f"{remote_base}/v1"
+            api_key = os.getenv("OLLAMA_API_KEY", "ollama")
+            provider = OpenAIProvider(base_url=remote_base, api_key=api_key)
+            return OpenAIChatModel(model_tag, provider=provider)
 
     def resolve_model_string(self, model_name: str) -> str:
         """Legacy string resolution."""
