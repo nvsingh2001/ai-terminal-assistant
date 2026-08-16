@@ -195,6 +195,14 @@ class NativeCLIAgent:
                 if user_input.startswith('/') or user_input.lower() in ['exit', 'quit', 'clear', 'help']:
                     if self.handle_slash_command(user_input):
                         continue
+                    # Unknown slash command — show hint instead of sending to LLM
+                    if user_input.startswith('/'):
+                        known = ['/model', '/skills', '/clear', '/help', '/exit', '/quit']
+                        # Simple fuzzy match: find closest command
+                        close = [c for c in known if c.startswith(user_input[:3])]
+                        hint = f" Did you mean {close[0]}?" if close else ""
+                        console.print(f"[bold #ef4444]Unknown command:[/bold #ef4444] [dim]{user_input}[/dim].{hint} Type [bold #38bdf8]/help[/bold #38bdf8] for available commands.\n")
+                        continue
 
                 self.execute_request(user_input)
 
