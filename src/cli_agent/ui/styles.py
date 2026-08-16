@@ -1,4 +1,4 @@
-"""OpenCode-Inspired Minimalist Dark Theme CSS stylesheets for Textual TUI Application."""
+"""Minimalist Dark Theme CSS stylesheets for Textual TUI Application."""
 
 APP_CSS = """
 Screen {
@@ -70,17 +70,17 @@ Screen {
     overflow-x: hidden;
 }
 
-.opencode-user {
+.agent-user {
     margin: 1 0 0 0;
     color: #38bdf8;
 }
 
-.opencode-router {
+.agent-router {
     margin: 0 0 0 1;
     color: #a855f7;
 }
 
-.opencode-execution {
+.agent-execution {
     margin: 1 0 1 1;
     color: #7ee787;
 }

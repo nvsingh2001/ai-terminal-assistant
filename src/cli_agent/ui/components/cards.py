@@ -11,11 +11,11 @@ class UserMessage(Static):
         text = Text()
         text.append("❯ ", style="bold #38bdf8")
         text.append(message, style="bold #f0f6fc")
-        super().__init__(text, classes="opencode-user")
+        super().__init__(text, classes="agent-user")
 
 
 class RouterCard(Static):
-    """OpenCode-inspired Intent & Skill Routing Card."""
+    """Developer-centric Intent & Skill Routing Card."""
     def __init__(self, routing_output: str):
         if isinstance(routing_output, bytes):
             routing_output = routing_output.decode('utf-8', errors='replace')
@@ -23,11 +23,11 @@ class RouterCard(Static):
         text = Text()
         text.append("  ⚡ Intent Routing: ", style="bold #a855f7")
         text.append(routing_str, style="dim #8b949e")
-        super().__init__(text, classes="opencode-router")
+        super().__init__(text, classes="agent-router")
 
 
 class ExecutionCard(Static):
-    """OpenCode-inspired Inline Terminal Code Block."""
+    """Developer-centric Inline Terminal Code Block."""
     def __init__(self, execution_output: str):
         if isinstance(execution_output, bytes):
             execution_output = execution_output.decode('utf-8', errors='replace')
@@ -40,4 +40,4 @@ class ExecutionCard(Static):
             title_align="left",
             border_style="#30363d"
         )
-        super().__init__(panel, classes="opencode-execution")
+        super().__init__(panel, classes="agent-execution")

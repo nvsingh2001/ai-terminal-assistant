@@ -25,8 +25,8 @@ from cli_agent.ui.components import UserMessage, RouterCard, ExecutionCard, Skil
 class CLIAgentApp(App):
     """OpenCode-Inspired Minimalist Full-Screen TUI for the AI CLI Agent."""
 
-    TITLE = "CLI Agent"
-    SUB_TITLE = "OpenCode Minimalist AI Terminal"
+    TITLE = "AI CLI Agent"
+    SUB_TITLE = "Skill-Based AI CLI Assistant"
     CSS = APP_CSS
 
     BINDINGS = [
@@ -52,11 +52,11 @@ class CLIAgentApp(App):
     def compose(self) -> ComposeResult:
         active_skills_count = len(skill_registry.list_skills())
         os_short = self.sys_info['os'].split()[0] if self.sys_info.get('os') else "Linux"
-        header_str = f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
+        header_str = f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]AI COMMAND LINE AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
         yield Label(header_str, id="header-info")
         
         with ScrollableContainer(id="chat-container"):
-            yield Static(f"[dim #8b949e]● OpenCode AI Terminal Ready.\nType commands in plain English or press Ctrl+S for Skills Palette.[/dim #8b949e]")
+            yield Static(f"[dim #38bdf8]● AI COMMAND LINE AGENT READY.[/dim #38bdf8]\n[dim #8b949e]Type instructions in plain English or press Ctrl+S for Skills Palette, Ctrl+M for Model Switcher.[/dim #8b949e]")
             
         yield SkillPaletteWidget()
 
