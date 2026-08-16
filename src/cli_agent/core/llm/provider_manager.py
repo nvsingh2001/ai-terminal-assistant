@@ -6,19 +6,32 @@ import litellm
 from cli_agent.core.llm.llama_cpp import LlamaCppEngine
 
 
+class _OllamaToolCall:
+    """Mimics LiteLLM tool_call structure."""
+    def __init__(self, id: str, name: str, arguments: str):
+        self.id = id
+        self.function = type("Function", (), {"name": name, "arguments": arguments})()
+
+
 class _OllamaResponse:
-    """Mimics LiteLLM response structure for direct Ollama HTTP calls."""
-    def __init__(self, content: str):
+    """Mimics LiteLLM response message structure for direct Ollama HTTP calls."""
+    def __init__(self, content: str, tool_calls: Optional[List] = None):
         self.content = content
-        self.tool_calls = None
+        self.tool_calls = tool_calls
+
+    def get(self, key, default=None):
+        """Allow dict-style access for compatibility with engine.py message appending."""
+        return getattr(self, key, default)
+
 
 class _OllamaChoice:
     def __init__(self, message):
         self.message = message
 
+
 class _OllamaResult:
-    def __init__(self, content: str):
-        self.choices = [_OllamaChoice(_OllamaResponse(content))]
+    def __init__(self, content: str, tool_calls: Optional[List] = None):
+        self.choices = [_OllamaChoice(_OllamaResponse(content, tool_calls))]
 
 
 class HybridLLMEngine:
@@ -26,51 +39,76 @@ class HybridLLMEngine:
     Unified Hybrid LLM Engine Router.
     Seamlessly routes requests between:
     - Native Local llama.cpp (GGUF in-memory execution)
-    - Local Ollama Engine (direct HTTP — bypasses LiteLLM's broken Ollama integration)
+    - Local Ollama Engine (direct HTTP with tool calling support)
     - Cloud APIs (OpenAI, Anthropic Claude, Google Gemini) via LiteLLM
     """
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or os.getenv("OLLAMA_MODEL_NAME", "ollama/qwen3.5:4b")
         self.llama_cpp_engine = LlamaCppEngine()
+        self._ollama_base = None  # Cached after first probe
 
-    def _call_ollama_direct(self, messages: List[Dict[str, Any]], model_tag: str) -> Dict[str, Any]:
-        """
-        Calls local Ollama HTTP API directly, bypassing LiteLLM entirely.
-        Prioritizes localhost:11434 if reachable, then falls back to OLLAMA_API_BASE.
-        """
-        ollama_key = os.getenv("OLLAMA_API_KEY", "")
+    def _get_ollama_base(self) -> str:
+        """Determines Ollama base URL. Prefers localhost, falls back to OLLAMA_API_BASE."""
+        if self._ollama_base:
+            return self._ollama_base
 
-        # Determine Ollama base URL: prefer local server, fall back to env var
         local_base = "http://localhost:11434"
         remote_base = os.getenv("OLLAMA_API_BASE", "")
 
-        # Check if local Ollama is running
         try:
             requests.get(f"{local_base}/api/tags", timeout=2)
-            ollama_base = local_base
+            self._ollama_base = local_base
         except Exception:
-            ollama_base = remote_base if remote_base else local_base
+            self._ollama_base = remote_base if remote_base else local_base
+
+        return self._ollama_base
+
+    def _call_ollama_direct(self, messages: List[Dict[str, Any]], model_tag: str,
+                            tools: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Calls local Ollama HTTP API directly with full tool calling support.
+        Prioritizes localhost:11434 if reachable, then falls back to OLLAMA_API_BASE.
+        """
+        ollama_base = self._get_ollama_base()
+        ollama_key = os.getenv("OLLAMA_API_KEY", "")
 
         headers = {"Content-Type": "application/json"}
         if ollama_key:
             headers["Authorization"] = f"Bearer {ollama_key}"
 
-        # Build the prompt from messages
+        # Serialize messages — convert any _OllamaResponse objects to dicts
+        serialized_messages = []
+        for msg in messages:
+            if isinstance(msg, dict):
+                serialized_messages.append(msg)
+            elif hasattr(msg, "content"):
+                m = {"role": getattr(msg, "role", "assistant"), "content": msg.content or ""}
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    m["tool_calls"] = [
+                        {"function": {"name": tc.function.name, "arguments": json.loads(tc.function.arguments)}}
+                        for tc in msg.tool_calls
+                    ]
+                serialized_messages.append(m)
+
         payload = {
             "model": model_tag,
-            "messages": messages,
+            "messages": serialized_messages,
             "stream": False,
             "options": {
                 "temperature": 0.1
             }
         }
 
+        # Include tools if provided
+        if tools:
+            payload["tools"] = tools
+
         try:
             resp = requests.post(
                 f"{ollama_base}/api/chat",
                 headers=headers,
                 json=payload,
-                timeout=120
+                timeout=180
             )
 
             if resp.status_code == 404:
@@ -85,11 +123,30 @@ class HybridLLMEngine:
             resp.raise_for_status()
             data = resp.json()
 
-            content = data.get("message", {}).get("content", "")
+            message_data = data.get("message", {})
+            content = message_data.get("content", "")
             if not content:
                 content = data.get("response", "")
 
-            return _OllamaResult(content)
+            # Parse tool calls from Ollama response
+            raw_tool_calls = message_data.get("tool_calls", None)
+            parsed_tool_calls = None
+
+            if raw_tool_calls:
+                parsed_tool_calls = []
+                for i, tc in enumerate(raw_tool_calls):
+                    func_data = tc.get("function", {})
+                    name = func_data.get("name", "")
+                    args = func_data.get("arguments", {})
+                    parsed_tool_calls.append(
+                        _OllamaToolCall(
+                            id=f"call_{i}",
+                            name=name,
+                            arguments=json.dumps(args) if isinstance(args, dict) else str(args)
+                        )
+                    )
+
+            return _OllamaResult(content, parsed_tool_calls)
 
         except requests.exceptions.ConnectionError:
             return {
@@ -100,7 +157,7 @@ class HybridLLMEngine:
             }
         except requests.exceptions.Timeout:
             return {
-                "error": f"Ollama request timed out after 120s for model '{model_tag}'.\n\n"
+                "error": f"Ollama request timed out after 180s for model '{model_tag}'.\n\n"
                          f"The model may be too large for your system. Try a smaller model."
             }
         except Exception as e:
@@ -118,14 +175,14 @@ class HybridLLMEngine:
             if not res.get("error"):
                 return res
 
-        # 2. Ollama models → Direct HTTP (bypasses LiteLLM)
+        # 2. Ollama models → Direct HTTP with tool calling (bypasses LiteLLM)
         if self.model_name.startswith("ollama/"):
             model_tag = self.model_name.replace("ollama/", "", 1)
-            return self._call_ollama_direct(messages, model_tag)
+            return self._call_ollama_direct(messages, model_tag, tools)
 
         # Also handle bare model names without provider prefix as Ollama
         if "/" not in self.model_name and not self.model_name.endswith(".gguf"):
-            return self._call_ollama_direct(messages, self.model_name)
+            return self._call_ollama_direct(messages, self.model_name, tools)
 
         # 3. Cloud Providers via LiteLLM (OpenAI, Anthropic, Gemini)
         kwargs = {
