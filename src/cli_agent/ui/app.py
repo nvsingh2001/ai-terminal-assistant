@@ -51,9 +51,9 @@ class CLIAgentApp(App):
         self.history_index = -1
 
     def compose(self) -> ComposeResult:
-        yield Header(show_clock=True)
         active_skills_count = len(skill_registry.list_skills())
-        env_banner = f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  |  [dim #94a3b8]OS: {self.sys_info['os']}  |  Branch: {self.sys_info['git_branch']}  |  Skills: {active_skills_count}[/dim #94a3b8]  |  [bold #10b981]Status: Ready[/bold #10b981]"
+        os_short = self.sys_info['os'].split()[0] if self.sys_info.get('os') else "Linux"
+        env_banner = f"[bold #38bdf8]AI COMMAND LINE AGENT[/bold #38bdf8]  │  [dim #94a3b8]OS: {os_short}  │  Branch: {self.sys_info['git_branch']}  │  Skills: {active_skills_count}[/dim #94a3b8]  │  [bold #10b981]Status: Ready[/bold #10b981]"
         yield Label(env_banner, id="header-info")
         
         with ScrollableContainer(id="chat-container"):

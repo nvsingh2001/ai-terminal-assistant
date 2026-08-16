@@ -7,11 +7,10 @@ Screen {
 }
 
 #header-info {
-    height: 3;
+    height: 1;
     background: #1e293b;
     color: #f8fafc;
     content-align: center middle;
-    border-bottom: heavy #38bdf8;
 }
 
 #chat-container {

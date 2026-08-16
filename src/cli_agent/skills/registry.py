@@ -21,10 +21,21 @@ class SkillRegistry:
 
     def discover_skills(self):
         """Discovers built-in skills and user skills from ~/.cli-agent/skills/."""
-        # 1. Load Built-in Skills
-        builtins_dir = os.path.join(os.path.dirname(__file__), "builtins")
-        if os.path.exists(builtins_dir):
-            self._load_skills_from_dir(builtins_dir)
+        # 1. Load Built-in Skills (Direct Import Guarantee)
+        try:
+            from cli_agent.skills.builtins.shell_execution.handler import ShellExecutionSkill
+            from cli_agent.skills.builtins.file_management.handler import FileManagementSkill
+            from cli_agent.skills.builtins.code_editing.handler import CodeEditingSkill
+            from cli_agent.skills.builtins.git_operations.handler import GitOperationsSkill
+
+            self.register(ShellExecutionSkill())
+            self.register(FileManagementSkill())
+            self.register(CodeEditingSkill())
+            self.register(GitOperationsSkill())
+        except Exception as e:
+            builtins_dir = os.path.join(os.path.dirname(__file__), "builtins")
+            if os.path.exists(builtins_dir):
+                self._load_skills_from_dir(builtins_dir)
 
         # 2. Load User Custom Skills
         if os.path.exists(USER_SKILLS_DIR):
