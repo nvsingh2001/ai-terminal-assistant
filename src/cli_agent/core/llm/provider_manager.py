@@ -28,17 +28,32 @@ class HybridLLMEngine:
         if not ("/" in provider_model or provider_model.startswith("ollama")):
             provider_model = f"ollama/{provider_model}"
 
+        kwargs = {
+            "model": provider_model,
+            "messages": messages,
+            "timeout": 120
+        }
+
+        if provider_model.startswith("ollama/"):
+            kwargs["api_base"] = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+
         try:
-            response = litellm.completion(
-                model=provider_model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto" if tools else None,
-                timeout=120
-            )
-            return response
+            return litellm.completion(**kwargs)
         except Exception as e:
             err_str = str(e)
+            # If tool calling failed on Ollama model, retry without tools
+            if tools and ("tool" in err_str.lower() or "schema" in err_str.lower()):
+                try:
+                    kwargs.pop("tools", None)
+                    kwargs.pop("tool_choice", None)
+                    return litellm.completion(**kwargs)
+                except Exception:
+                    pass
+
             if "not found" in err_str.lower() or "404" in err_str:
                 return {
                     "error": f"Model '{provider_model}' was not found.\n\n"
