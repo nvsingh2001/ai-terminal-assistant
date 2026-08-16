@@ -109,8 +109,20 @@ class NativeCLIAgent:
                         return True
                 elif choice == "3":
                     new_model = "gemini/gemini-1.5-flash"
+                    if not os.getenv("GEMINI_API_KEY"):
+                        key = self.session.prompt("Enter GEMINI_API_KEY > ").strip()
+                        if key:
+                            os.environ["GEMINI_API_KEY"] = key
+                            config_manager.config.api_keys["gemini"] = key
+                            config_manager.save_config(config_manager.config)
                 elif choice == "4":
                     new_model = "openai/gpt-4o-mini"
+                    if not os.getenv("OPENAI_API_KEY"):
+                        key = self.session.prompt("Enter OPENAI_API_KEY > ").strip()
+                        if key:
+                            os.environ["OPENAI_API_KEY"] = key
+                            config_manager.config.api_keys["openai"] = key
+                            config_manager.save_config(config_manager.config)
                 elif choice == "5":
                     new_model = self.session.prompt("Enter model string or path (e.g. ollama/llama3.2 or /path/model.gguf) > ").strip()
 
