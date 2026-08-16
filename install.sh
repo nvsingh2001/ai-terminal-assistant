@@ -12,9 +12,17 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 
 if [ "$OS" = "Darwin" ]; then
-    BINARY_NAME="cli-agent-darwin-arm64"
+    if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+        BINARY_NAME="cli-agent-darwin-arm64"
+    else
+        BINARY_NAME="cli-agent-darwin-amd64"
+    fi
 elif [ "$OS" = "Linux" ]; then
-    BINARY_NAME="cli-agent-linux-amd64"
+    if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
+        BINARY_NAME="cli-agent-linux-amd64"
+    else
+        BINARY_NAME="cli-agent-linux-amd64"
+    fi
 else
     echo "Unsupported Operating System: $OS"
     exit 1
