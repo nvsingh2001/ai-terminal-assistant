@@ -72,6 +72,12 @@ class DirectAgentEngine:
                     tools=tools_schema if tools_schema else None
                 )
 
+                if isinstance(response, dict) and response.get("error"):
+                    return {
+                        "routing": "Model Provider Notice",
+                        "execution": response["error"]
+                    }
+
                 response_message = response.choices[0].message
                 messages.append(response_message)
 

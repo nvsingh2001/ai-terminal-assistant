@@ -22,6 +22,17 @@ class AgentConfig:
                 "gemini": os.getenv("GEMINI_API_KEY", "")
             }
 
+        # Auto-detect default model based on available environment API keys
+        if self.model_name == "ollama/gemma4:31b-cloud" or not self.model_name:
+            if os.getenv("GEMINI_API_KEY"):
+                self.model_name = "gemini/gemini-1.5-flash"
+            elif os.getenv("OPENAI_API_KEY"):
+                self.model_name = "openai/gpt-4o-mini"
+            elif os.getenv("ANTHROPIC_API_KEY"):
+                self.model_name = "anthropic/claude-3-5-sonnet"
+            else:
+                self.model_name = "ollama/qwen2.5-coder"
+
 class ConfigManager:
     """
     Manages persistent configuration settings (~/.cli-agent/config.yaml),

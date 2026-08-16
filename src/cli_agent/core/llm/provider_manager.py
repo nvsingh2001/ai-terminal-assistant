@@ -28,11 +28,23 @@ class HybridLLMEngine:
         if not ("/" in provider_model or provider_model.startswith("ollama")):
             provider_model = f"ollama/{provider_model}"
 
-        response = litellm.completion(
-            model=provider_model,
-            messages=messages,
-            tools=tools,
-            tool_choice="auto" if tools else None,
-            timeout=120
-        )
-        return response
+        try:
+            response = litellm.completion(
+                model=provider_model,
+                messages=messages,
+                tools=tools,
+                tool_choice="auto" if tools else None,
+                timeout=120
+            )
+            return response
+        except Exception as e:
+            err_str = str(e)
+            if "not found" in err_str.lower() or "404" in err_str:
+                return {
+                    "error": f"Model '{provider_model}' was not found.\n\n"
+                             f"👉 **Action Required**:\n"
+                             f"1. Press **Ctrl+M** inside the app to open the Model Selector screen.\n"
+                             f"2. Or pull the model locally via `ollama pull {provider_model.replace('ollama/', '')}`\n"
+                             f"3. Or set an API key (`export GEMINI_API_KEY=...` or `export OPENAI_API_KEY=...`)"
+                }
+            raise e
