@@ -174,13 +174,16 @@ class NativeCLIAgent:
         console.print()
 
     def _render_output(self, output: str):
-        """Renders execution output as minimalist left-accent lines (| output) without box borders."""
+        """Renders execution output using Rich Markdown for proper formatting."""
         if not output:
             return
 
-        lines = output.split('\n')
-        for line in lines:
-            console.print(f" [dim #38bdf8]│[/dim #38bdf8] {line}")
+        try:
+            md = Markdown(output)
+            console.print(md)
+        except Exception:
+            # Fallback to plain text if markdown parsing fails
+            console.print(output)
 
     def run(self):
         """Main Native REPL Loop."""
