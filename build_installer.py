@@ -65,6 +65,15 @@ def build():
         ext = ".exe" if sys.platform == "win32" else ""
         out_file = os.path.join(dist_dir, f"{binary_name}{ext}")
         print(f"Standalone executable created at: {out_file}")
+        
+        # Atomically install to ~/.local/bin if directory exists
+        local_bin = os.path.expanduser("~/.local/bin")
+        if os.path.exists(local_bin) and sys.platform != "win32":
+            target_bin = os.path.join(local_bin, binary_name)
+            subprocess.run(["install", "-m", "755", out_file, target_bin], check=False)
+            alias_bin = os.path.join(local_bin, "cli-agent")
+            subprocess.run(["ln", "-sf", target_bin, alias_bin], check=False)
+            print(f"Installed to {target_bin} and symlinked {alias_bin}")
     else:
         print("\n=== BUILD FAILED ===")
         sys.exit(1)
