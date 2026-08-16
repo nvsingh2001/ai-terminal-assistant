@@ -1,21 +1,19 @@
 import os
 import json
-from typing import Dict, Any, List, Optional, AsyncIterator
-import litellm
+from typing import Dict, Any, List, Optional
 from cli_agent.skills import skill_registry
 from cli_agent.services.memory_manager import session_memory
 from cli_agent.services.env_detector import get_env_context_string
-
 from cli_agent.core.config_manager import config_manager
+from cli_agent.core.llm import HybridLLMEngine
 
 class DirectAgentEngine:
     """
     High-performance native agent execution engine operating directly via LiteLLM / Ollama / llama.cpp
-    without CrewAI framework overhead.
+    with robust function calling and fallback synthesis.
     """
     def __init__(self, model_name: Optional[str] = None):
         self.model_name = model_name or config_manager.config.model_name
-        # Ensure litellm provider prefix if ollama
         if not ("/" in self.model_name or self.model_name.startswith("ollama")):
             self.model_name = f"ollama/{self.model_name}"
 
@@ -57,11 +55,11 @@ class DirectAgentEngine:
         tools_schema = self.get_tool_schemas()
         routing_summary = f"**[Direct Engine Routing]** Processing via native function calling schema with {len(tools_schema)} active skills."
         
-        max_turns = 10
+        max_turns = 8
         turn_count = 0
         final_output = ""
+        executed_tool_results = []
 
-        from cli_agent.core.llm import HybridLLMEngine
         hybrid_llm = HybridLLMEngine(self.model_name)
 
         while turn_count < max_turns:
@@ -79,11 +77,13 @@ class DirectAgentEngine:
                     }
 
                 response_message = response.choices[0].message
-                messages.append(response_message)
+                content = (response_message.content or "").strip()
+                tool_calls = getattr(response_message, "tool_calls", None)
 
-                # Check if model invoked tool calls
-                if hasattr(response_message, "tool_calls") and response_message.tool_calls:
-                    for tool_call in response_message.tool_calls:
+                # Case 1: Model executed function tool calls
+                if tool_calls:
+                    messages.append(response_message)
+                    for tool_call in tool_calls:
                         function_name = tool_call.function.name
                         try:
                             function_args = json.loads(tool_call.function.arguments)
@@ -92,29 +92,52 @@ class DirectAgentEngine:
 
                         # Execute skill via SkillRegistry
                         skill_output = skill_registry.execute(function_name, **function_args)
+                        executed_tool_results.append(f"**[{function_name}]**\n{skill_output}")
 
                         messages.append({
-                            "tool_call_id": tool_call.id,
+                            "tool_call_id": getattr(tool_call, "id", f"call_{len(messages)}"),
                             "role": "tool",
                             "name": function_name,
                             "content": str(skill_output)
                         })
-                else:
-                    # Model returned final answer
-                    final_output = response_message.content or "Task completed."
+                    continue
+
+                # Case 2: Model returned non-empty content
+                if content:
+                    final_output = content
                     break
+
+                # Case 3: Model returned empty content and no tool calls
+                # Fallback: Retry with direct prompt completion without tool schema
+                retry_res = hybrid_llm.complete(messages=messages, tools=None)
+                if not (isinstance(retry_res, dict) and retry_res.get("error")):
+                    retry_content = (retry_res.choices[0].message.content or "").strip()
+                    if retry_content:
+                        final_output = retry_content
+                        break
+
+                # If tools were executed, return their combined output
+                if executed_tool_results:
+                    final_output = "\n\n".join(executed_tool_results)
+                    break
+
+                final_output = "I was unable to generate a response. Please check your model connection or try a different model."
+                break
 
             except Exception as e:
                 err_msg = str(e)
                 if "404" in err_msg or "not found" in err_msg:
-                    err_msg = f"Model '{self.model_name}' not found. Please check OLLAMA_MODEL_NAME setting."
+                    err_msg = f"Model '{self.model_name}' not found. Please check your model configuration."
                 return {
                     "routing": "Routing error encountered.",
                     "execution": f"Error executing task: {err_msg}"
                 }
 
-        if not final_output and messages:
-            final_output = messages[-1].get("content", "Task executed successfully.")
+        if not final_output:
+            if executed_tool_results:
+                final_output = "\n\n".join(executed_tool_results)
+            else:
+                final_output = "Task executed successfully."
 
         session_memory.add_turn(user_request, "DirectEngine", final_output)
         return {
