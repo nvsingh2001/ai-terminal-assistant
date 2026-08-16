@@ -8,25 +8,27 @@ CONFIG_FILE_PATH = os.path.expanduser("~/.cli-agent/config.yaml")
 
 def discover_working_model(current_model: Optional[str] = None) -> str:
     """
-    Dynamically discovers a 100% working model on the user's system:
-    1. Queries local Ollama API (http://localhost:11434/api/tags) for pulled models with valid size > 0.
-    2. Checks environment API keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY).
-    3. Falls back to llama.cpp GGUF files if present.
+    Dynamically discovers a working model on the user's system:
+    1. If user already has a configured model, respects it.
+    2. Queries local Ollama API for installed generation models.
+    3. Checks environment API keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY).
+    4. Falls back to ollama/gemma4:31b-cloud or ollama/qwen3.5:4b.
     """
-    # 1. Query local Ollama API for valid installed generation models (size > 10MB, non-embedding)
+    if current_model and current_model.strip():
+        return current_model.strip()
+
+    # Query local Ollama API for valid installed generation models (non-embedding)
     try:
         res = requests.get("http://localhost:11434/api/tags", timeout=2).json()
         models = res.get("models", [])
-        # Find first valid local model with size > 10MB (excludes cloud manifest proxies and embedding models)
         for m in models:
             name = m.get("name", "")
-            size = m.get("size", 0)
-            if size and size > 10_000_000 and name and "embed" not in name.lower():
+            if name and "embed" not in name.lower():
                 return f"ollama/{name}"
     except Exception:
         pass
 
-    # 2. Check for Cloud API keys
+    # Check for Cloud API keys
     if os.getenv("GEMINI_API_KEY"):
         return "gemini/gemini-1.5-flash"
     elif os.getenv("OPENAI_API_KEY"):
@@ -34,11 +36,7 @@ def discover_working_model(current_model: Optional[str] = None) -> str:
     elif os.getenv("ANTHROPIC_API_KEY"):
         return "anthropic/claude-3-5-sonnet"
 
-    # 3. Fallback
-    if current_model and not ("gemma4:31b-cloud" in current_model or "qwen2.5-coder" in current_model):
-        return current_model
-
-    return "ollama/qwen3.5:4b"
+    return "ollama/gemma4:31b-cloud"
 
 
 @dataclass
@@ -58,8 +56,8 @@ class AgentConfig:
                 "gemini": os.getenv("GEMINI_API_KEY", "")
             }
 
-        # Auto-discover working model if unset or invalid
-        if not self.model_name or "gemma4:31b-cloud" in self.model_name or "qwen2.5-coder" in self.model_name:
+        # Auto-discover working model if unset
+        if not self.model_name:
             self.model_name = discover_working_model(self.model_name)
 
 
@@ -78,9 +76,8 @@ class ConfigManager:
                 with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
                     data = yaml.safe_load(f) or {}
                     cfg = AgentConfig(**{k: v for k, v in data.items() if k in AgentConfig.__annotations__})
-                    # Re-verify model validity
-                    if "gemma4:31b-cloud" in cfg.model_name or "qwen2.5-coder" in cfg.model_name:
-                        cfg.model_name = discover_working_model(cfg.model_name)
+                    if not cfg.model_name:
+                        cfg.model_name = discover_working_model()
                         self.save_config(cfg)
                     return cfg
             except Exception as e:

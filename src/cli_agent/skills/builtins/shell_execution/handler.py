@@ -1,30 +1,22 @@
 import subprocess
 import os
+import sys
 from cli_agent.skills.base import BaseSkill, SkillManifest
 
-IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "__pycache__", "build", "dist", ".idea", ".vscode"}
-
-def filter_shell_output(output_text: str) -> str:
+def truncate_output(output_text: str, max_chars: int = 15000) -> str:
+    """Safely truncates command output to avoid blowing LLM context windows."""
     if not output_text:
         return ""
-    lines = output_text.splitlines()
-    clean_lines = []
-    for line in lines:
-        line_parts = set(os.path.normpath(line).lower().split(os.sep))
-        if not any(ignored.lower() in line_parts for ignored in IGNORE_DIRS):
-            clean_lines.append(line)
-    
-    if len(clean_lines) > 500:
-        clean_lines = clean_lines[:500]
-        clean_lines.append("\n[... Command output capped to top 500 lines to prevent prompt context window overload ...]")
-    return "\n".join(clean_lines)
+    if len(output_text) > max_chars:
+        return output_text[:max_chars] + f"\n\n[... Output truncated to {max_chars} chars ...]"
+    return output_text
 
 class ShellExecutionSkill(BaseSkill):
     @property
     def manifest(self) -> SkillManifest:
         return SkillManifest(
             name="shell_execution",
-            description="Executes system terminal commands with line filtering and cross-platform safety guardrails.",
+            description="Executes system terminal commands with bash shell support, real-time stderr capture, and safety guardrails.",
             requires_approval=True,
             parameters_schema={
                 "type": "object",
@@ -52,35 +44,35 @@ class ShellExecutionSkill(BaseSkill):
                 if pattern_norm in cmd_lower:
                     return f"Error: Shell execution blocked by cross-platform guardrail. Command contains dangerous pattern '{pattern}'."
 
+            # Use bash on Linux/macOS to ensure support for 'source', process substitution, and scripts
+            executable = "/bin/bash" if sys.platform != "win32" and os.path.exists("/bin/bash") else None
+
             result = subprocess.run(
                 command,
                 shell=True,
+                executable=executable,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=120,
                 cwd=os.getcwd()
             )
             
-            output = []
-            if result.stdout:
-                filtered_stdout = filter_shell_output(result.stdout)
-                if filtered_stdout:
-                    output.append(f"STDOUT:\n{filtered_stdout}")
-            if result.stderr:
-                filtered_stderr = filter_shell_output(result.stderr)
-                if filtered_stderr:
-                    output.append(f"STDERR:\n{filtered_stderr}")
+            output_parts = []
+            if result.returncode != 0:
+                output_parts.append(f"[Process returned exit code {result.returncode}]")
+
+            if result.stdout and result.stdout.strip():
+                output_parts.append(f"STDOUT:\n{truncate_output(result.stdout.strip())}")
+
+            if result.stderr and result.stderr.strip():
+                output_parts.append(f"STDERR:\n{truncate_output(result.stderr.strip())}")
                 
-            if not output:
-                return f"Command executed successfully with exit code {result.returncode} (No relevant output)."
+            if not output_parts:
+                return f"Command executed successfully (exit code {result.returncode}, no output)."
                 
-            full_output = "\n".join(output)
-            max_chars = 20000
-            if len(full_output) > max_chars:
-                return full_output[:max_chars] + f"\n\n[WARNING: Shell output truncated from {len(full_output)} characters to {max_chars} characters to prevent LLM context limit overflow.]"
-                
-            return full_output
+            return "\n\n".join(output_parts)
+            
         except subprocess.TimeoutExpired:
-            return "Error: Command timed out after 60 seconds."
+            return "Error: Command timed out after 120 seconds."
         except Exception as e:
             return f"Error executing command: {str(e)}"

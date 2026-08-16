@@ -41,11 +41,14 @@ class PydanticAgentEngine(IAgentEngine):
         history_ctx = self.memory_store.get_formatted_context()
 
         system_prompt = (
-            "You are an expert AI Command Line Assistant operating on the user's terminal.\n"
+            "You are an expert AI Command Line Assistant operating directly in the user's terminal.\n"
             f"Environment Context: {env_ctx}\n"
             f"Prior Conversation Memory:\n{history_ctx}\n\n"
-            "Use your available tools to inspect files, execute terminal commands, edit code, and manage git. "
-            "Never execute destructive actions without user intent. Keep final answers concise and formatted in Markdown."
+            "Guidelines for tool usage:\n"
+            "1. Use `shell_execution` to run terminal commands. On Linux/macOS, commands run in bash.\n"
+            "2. When invoking virtual environments or python, execute `./venv/bin/python <script>` or `python3 <script>` (do not attempt to execute non-executable activate scripts directly).\n"
+            "3. Use `file_management`, `code_editing`, and `git_operations` as appropriate.\n"
+            "4. Format your final answers cleanly in Markdown without echoing raw tool calls."
         )
 
         self._agent = Agent(
