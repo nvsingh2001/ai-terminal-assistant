@@ -16,11 +16,16 @@ def print_aegis_banner(
     verbose_enabled: bool,
     project_id: str
 ):
-    """Renders the aesthetic Aegis ANSI art logo and status bar."""
-    trace_status = "[bold #10b981]ON[/bold #10b981]" if verbose_enabled else "[dim #64748b]OFF[/dim #64748b]"
+    """Renders the aesthetic Aegis ANSI art logo and structured status dashboard."""
+    trace_badge = "[bold #10b981]ON[/bold #10b981]" if verbose_enabled else "[dim #64748b]OFF[/dim #64748b]"
     
     console.print(AEGIS_ANSI_LOGO)
-    console.print(f"  [dim #94a3b8]Autonomous Terminal Agent v2.0[/dim #94a3b8]  │  [bold #10b981]● System Ready[/bold #10b981]")
-    console.print(f"  [dim #64748b]Model:[/dim #64748b] [bold #38bdf8]{model_name}[/bold #38bdf8]  │  [dim #64748b]Branch:[/dim #64748b] [dim #f8fafc]{git_branch}[/dim #f8fafc]  │  [dim #64748b]Skills:[/dim #64748b] [bold #a855f7]{skills_count} loaded[/bold #a855f7]  │  [dim #64748b]Trace:[/dim #64748b] {trace_status}")
-    console.print(f"  [dim #64748b]Type instructions or [/dim #64748b][bold #38bdf8]/help[/bold #38bdf8][dim #64748b], [/dim #64748b][bold #38bdf8]/memory[/bold #38bdf8][dim #64748b] for facts, [/dim #64748b][bold #38bdf8]/verbose[/bold #38bdf8][dim #64748b] to toggle trace, [/dim #64748b][bold #38bdf8]/model[/bold #38bdf8][dim #64748b] to switch models.[/dim #64748b]")
-    console.print()
+    console.print(f"  [dim #94a3b8]Autonomous AI Terminal Agent[/dim #94a3b8] [dim #64748b]v2.0[/dim #64748b]  │  [bold #10b981]● System Ready[/bold #10b981]\n")
+    
+    console.print(f"  [bold #38bdf8]Model:[/bold #38bdf8]    [bold #f8fafc]{model_name}[/bold #f8fafc]")
+    console.print(f"  [bold #a855f7]Runtime:[/bold #a855f7]  Branch: [dim #f8fafc]{git_branch}[/dim #f8fafc]  │  Skills: [bold #a855f7]{skills_count} active[/bold #a855f7]  │  Trace: {trace_badge}")
+    console.print(f"  [bold #10b981]Memory:[/bold #10b981]   Tri-Tier SQLite WAL  │  Project: [dim #f8fafc]{project_id}[/dim #f8fafc]\n")
+
+    console.print("  [dim #64748b]Quick Commands:[/dim #64748b]")
+    console.print("    [bold #38bdf8]/model[/bold #38bdf8]    [dim #94a3b8]Switch LLM model[/dim #94a3b8]       [bold #38bdf8]/memory[/bold #38bdf8]   [dim #94a3b8]Inspect persistent knowledge[/dim #94a3b8]")
+    console.print("    [bold #38bdf8]/verbose[/bold #38bdf8]  [dim #94a3b8]Toggle live trace[/dim #94a3b8]      [bold #38bdf8]/help[/bold #38bdf8]     [dim #94a3b8]Show full command palette[/dim #94a3b8]\n")
