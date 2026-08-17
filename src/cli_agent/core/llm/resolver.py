@@ -3,13 +3,17 @@ import requests
 from typing import Any
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.ollama import OllamaProvider
 from cli_agent.core.interfaces.model import IModelResolver
 
 class ModelResolver(IModelResolver):
     """
     Translates user model configurations into Model instances compatible with PydanticAI.
-    Smart-routes between local Ollama (if pulled locally) and Ollama Cloud / remote endpoints.
+    Smart-routes between local Ollama (if pulled locally), Ollama Cloud, Gemini, OpenAI, and Anthropic.
     """
     def _is_locally_installed(self, model_tag: str) -> bool:
         """Checks if a model is installed in the local Ollama instance."""
@@ -34,13 +38,22 @@ class ModelResolver(IModelResolver):
         clean = model_name.strip()
 
         if clean.startswith("gemini/") or clean.startswith("google/"):
-            return f"google-gla:{clean.split('/', 1)[1]}"
+            tag = clean.split("/", 1)[1]
+            key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+            provider = GoogleProvider(api_key=key or "missing-key")
+            return GoogleModel(tag, provider=provider)
 
         elif clean.startswith("openai/"):
-            return f"openai:{clean.split('/', 1)[1]}"
+            tag = clean.split("/", 1)[1]
+            key = os.getenv("OPENAI_API_KEY") or ""
+            provider = OpenAIProvider(api_key=key or "missing-key")
+            return OpenAIChatModel(tag, provider=provider)
 
         elif clean.startswith("anthropic/"):
-            return f"anthropic:{clean.split('/', 1)[1]}"
+            tag = clean.split("/", 1)[1]
+            key = os.getenv("ANTHROPIC_API_KEY") or ""
+            provider = AnthropicProvider(api_key=key or "missing-key")
+            return AnthropicModel(tag, provider=provider)
 
         else:
             model_tag = clean.replace("ollama/", "")

@@ -1,5 +1,7 @@
 from rich.table import Table
-from cli_agent.commands.base import ISlashCommand, CommandContext
+
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class SkillsCommand(ISlashCommand):
     """Displays registered skill plugins and tool capabilities."""

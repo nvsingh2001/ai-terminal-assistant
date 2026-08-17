@@ -1,10 +1,11 @@
-import os
 import hashlib
+import os
 import subprocess
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from cli_agent.core.interfaces.memory import IMemoryStore, MemoryEpisode, ProjectFact
 from cli_agent.memory.sqlite_store import SQLiteMemoryStore
+
 
 def get_project_identifier() -> str:
     """
@@ -15,7 +16,7 @@ def get_project_identifier() -> str:
         git_root = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
             stderr=subprocess.DEVNULL,
-            text=True
+            text=True,
         ).strip()
         if git_root:
             proj_name = os.path.basename(git_root)
@@ -37,6 +38,7 @@ class TriTierMemoryManager:
     - Tier 2: Project-Scoped Architectural & Environment Knowledge
     - Tier 3: Episodic Task Recall & Solution History
     """
+
     def __init__(self, store: Optional[IMemoryStore] = None):
         self.store: IMemoryStore = store or SQLiteMemoryStore()
         self.project_id: str = get_project_identifier()
@@ -60,8 +62,15 @@ class TriTierMemoryManager:
         self.store.set_project_fact(self.project_id, key, value, category)
 
     # Tier 3: Episodic
-    def record_episode(self, user_prompt: str, solution_summary: str, tools_used: Optional[List[str]] = None) -> int:
-        return self.store.add_episode(self.project_id, user_prompt, solution_summary, tools_used)
+    def record_episode(
+        self,
+        user_prompt: str,
+        solution_summary: str,
+        tools_used: Optional[List[str]] = None,
+    ) -> int:
+        return self.store.add_episode(
+            self.project_id, user_prompt, solution_summary, tools_used
+        )
 
     def get_recent_episodes(self, limit: int = 5) -> List[MemoryEpisode]:
         return self.store.get_recent_episodes(self.project_id, limit=limit)
@@ -93,8 +102,13 @@ class TriTierMemoryManager:
         # 2. Project Knowledge
         project_facts = self.get_project_facts()
         if project_facts:
-            fact_lines = [f"  • [{f.category}] {f.key}: {f.value}" for f in project_facts]
-            sections.append(f"Project Architecture & Rules ({self.project_id}):\n" + "\n".join(fact_lines))
+            fact_lines = [
+                f"  • [{f.category}] {f.key}: {f.value}" for f in project_facts
+            ]
+            sections.append(
+                f"Project Architecture & Rules ({self.project_id}):\n"
+                + "\n".join(fact_lines)
+            )
 
         # 3. Relevant Past Episodes
         if current_query:
@@ -102,9 +116,13 @@ class TriTierMemoryManager:
             if episodes:
                 ep_lines = []
                 for ep in episodes:
-                    tools_str = f" (Tools: {', '.join(ep.tools_used)})" if ep.tools_used else ""
+                    tools_str = (
+                        f" (Tools: {', '.join(ep.tools_used)})" if ep.tools_used else ""
+                    )
                     summary = ep.solution_summary[:150].replace("\n", " ")
-                    ep_lines.append(f"  • Prior task '{ep.user_prompt[:60]}'{tools_str} -> {summary}")
+                    ep_lines.append(
+                        f"  • Prior task '{ep.user_prompt[:60]}'{tools_str} -> {summary}"
+                    )
                 sections.append("Relevant Past Solutions:\n" + "\n".join(ep_lines))
 
         if not sections:

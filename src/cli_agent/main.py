@@ -1,6 +1,7 @@
-import sys
-import os
 import argparse
+import os
+import sys
+
 from dotenv import load_dotenv
 
 # Ensure src directory is in sys.path
@@ -8,14 +9,15 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from cli_agent.ui.native_app import run_native_app
 
+
 def load_environment():
-    """Loads environment configuration from ~/.cli-agent/.env and local .env."""
+    """Loads environment configuration ONLY from ~/.cli-agent/.env (isolated global credentials)."""
     config_dir = os.path.expanduser("~/.cli-agent")
     global_env_path = os.path.join(config_dir, ".env")
-    
+
     if os.path.exists(global_env_path):
-        load_dotenv(global_env_path)
-    load_dotenv()
+        load_dotenv(global_env_path, override=True)
+
 
 def run_cli():
     """Main CLI Application Entry Point."""
@@ -26,6 +28,7 @@ def run_cli():
 
     # Launch next-generation native terminal interface
     run_native_app()
+
 
 if __name__ == "__main__":
     run_cli()

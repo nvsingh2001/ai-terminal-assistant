@@ -1,5 +1,7 @@
 import sys
-from cli_agent.commands.base import ISlashCommand, CommandContext
+
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class ExitCommand(ISlashCommand):
     """Exits the interactive agent REPL session."""

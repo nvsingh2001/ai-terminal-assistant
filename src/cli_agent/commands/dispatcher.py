@@ -1,11 +1,14 @@
 from typing import Dict, List
-from cli_agent.commands.base import ISlashCommand, CommandContext
+
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class CommandDispatcher:
     """
     Invoker in the Command Pattern.
     Routes user input to registered command handlers with fuzzy typo matching.
     """
+
     def __init__(self, context: CommandContext):
         self.context = context
         self._commands: Dict[str, ISlashCommand] = {}
@@ -14,7 +17,7 @@ class CommandDispatcher:
             "quit": "/exit",
             "/quit": "/exit",
             "clear": "/clear",
-            "help": "/help"
+            "help": "/help",
         }
 
     def register(self, command: ISlashCommand):
@@ -50,7 +53,7 @@ class CommandDispatcher:
             return self._commands[raw_cmd].execute(self.context, raw_args)
 
         # If starts with '/', it was intended as a command -> fuzzy suggestion
-        if raw_cmd.startswith('/'):
+        if raw_cmd.startswith("/"):
             known = list(self._commands.keys())
             matches = [c for c in known if c.startswith(raw_cmd[:3])]
             hint = f" Did you mean '{matches[0]}'?" if matches else ""

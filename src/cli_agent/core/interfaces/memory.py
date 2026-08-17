@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
+
 
 @dataclass
 class MemoryEpisode:
@@ -11,12 +12,14 @@ class MemoryEpisode:
     tools_used: List[str]
     timestamp: str
 
+
 @dataclass
 class ProjectFact:
     key: str
     value: str
     category: str
     updated_at: str
+
 
 class IMemoryStore(ABC):
     """
@@ -40,7 +43,9 @@ class IMemoryStore(ABC):
         pass
 
     @abstractmethod
-    def set_project_fact(self, project_id: str, key: str, value: str, category: str = "general") -> None:
+    def set_project_fact(
+        self, project_id: str, key: str, value: str, category: str = "general"
+    ) -> None:
         """Sets or updates a project-specific fact."""
         pass
 
@@ -50,23 +55,29 @@ class IMemoryStore(ABC):
         project_id: str,
         user_prompt: str,
         solution_summary: str,
-        tools_used: Optional[List[str]] = None
+        tools_used: Optional[List[str]] = None,
     ) -> int:
         """Records a completed task episode in episodic memory."""
         pass
 
     @abstractmethod
-    def get_recent_episodes(self, project_id: str, limit: int = 5) -> List[MemoryEpisode]:
+    def get_recent_episodes(
+        self, project_id: str, limit: int = 5
+    ) -> List[MemoryEpisode]:
         """Retrieves most recent task episodes for the project."""
         pass
 
     @abstractmethod
-    def search_episodes(self, project_id: str, query: str, limit: int = 3) -> List[MemoryEpisode]:
+    def search_episodes(
+        self, project_id: str, query: str, limit: int = 3
+    ) -> List[MemoryEpisode]:
         """Searches past episodes by keyword relevance."""
         pass
 
     @abstractmethod
-    def delete_memory(self, tier: str, key_or_id: str, project_id: Optional[str] = None) -> bool:
+    def delete_memory(
+        self, tier: str, key_or_id: str, project_id: Optional[str] = None
+    ) -> bool:
         """Deletes a memory record from the specified tier."""
         pass
 

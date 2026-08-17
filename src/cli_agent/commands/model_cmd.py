@@ -1,5 +1,7 @@
 import os
-from cli_agent.commands.base import ISlashCommand, CommandContext
+
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class ModelCommand(ISlashCommand):
     """Handles LLM Model & Provider interactive switching."""
@@ -34,36 +36,49 @@ class ModelCommand(ISlashCommand):
 
             if choice == "1":
                 new_model = "ollama/nemotron-3-ultra"
+                if not os.getenv("OLLAMA_API_KEY"):
+                    key = session.prompt("Enter OLLAMA_API_KEY (from ollama.com) > ").strip()
+                    if key:
+                        cfg.set_api_key("OLLAMA_API_KEY", key)
+                if not os.getenv("OLLAMA_API_BASE"):
+                    cfg.set_api_key("OLLAMA_API_BASE", "https://ollama.com/v1")
             elif choice == "2":
                 new_model = "ollama/gpt-oss:120b"
+                if not os.getenv("OLLAMA_API_KEY"):
+                    key = session.prompt("Enter OLLAMA_API_KEY (from ollama.com) > ").strip()
+                    if key:
+                        cfg.set_api_key("OLLAMA_API_KEY", key)
+                if not os.getenv("OLLAMA_API_BASE"):
+                    cfg.set_api_key("OLLAMA_API_BASE", "https://ollama.com/v1")
             elif choice == "3":
                 new_model = "ollama/gemma4:31b"
+                if not os.getenv("OLLAMA_API_KEY"):
+                    key = session.prompt("Enter OLLAMA_API_KEY (from ollama.com) > ").strip()
+                    if key:
+                        cfg.set_api_key("OLLAMA_API_KEY", key)
+                if not os.getenv("OLLAMA_API_BASE"):
+                    cfg.set_api_key("OLLAMA_API_BASE", "https://ollama.com/v1")
             elif choice == "4":
                 new_model = "ollama/qwen3.5:4b"
             elif choice == "5":
                 new_model = "gemini/gemini-2.0-flash"
-                if not os.getenv("GEMINI_API_KEY"):
-                    key = session.prompt("Enter GEMINI_API_KEY > ").strip()
+                if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
+                    key = session.prompt("Enter GEMINI_API_KEY (from aistudio.google.com) > ").strip()
                     if key:
-                        os.environ["GEMINI_API_KEY"] = key
-                        cfg.config.api_keys["gemini"] = key
-                        cfg.save_config(cfg.config)
+                        cfg.set_api_key("GEMINI_API_KEY", key)
+                        cfg.set_api_key("GOOGLE_API_KEY", key)
             elif choice == "6":
                 new_model = "openai/gpt-4o-mini"
                 if not os.getenv("OPENAI_API_KEY"):
                     key = session.prompt("Enter OPENAI_API_KEY > ").strip()
                     if key:
-                        os.environ["OPENAI_API_KEY"] = key
-                        cfg.config.api_keys["openai"] = key
-                        cfg.save_config(cfg.config)
+                        cfg.set_api_key("OPENAI_API_KEY", key)
             elif choice == "7":
                 new_model = "anthropic/claude-3-5-sonnet"
                 if not os.getenv("ANTHROPIC_API_KEY"):
                     key = session.prompt("Enter ANTHROPIC_API_KEY > ").strip()
                     if key:
-                        os.environ["ANTHROPIC_API_KEY"] = key
-                        cfg.config.api_keys["anthropic"] = key
-                        cfg.save_config(cfg.config)
+                        cfg.set_api_key("ANTHROPIC_API_KEY", key)
             elif choice == "8":
                 gguf_path = session.prompt("Enter absolute path to your .gguf file > ").strip()
                 if os.path.exists(gguf_path):

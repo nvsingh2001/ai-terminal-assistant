@@ -2,9 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Optional
 
+
 @dataclass
 class CommandContext:
     """Encapsulates dependencies required by slash commands."""
+
     prompt_session: Any
     config_manager: Any
     skill_registry: Any
@@ -13,9 +15,10 @@ class CommandContext:
     engine: Optional[Any] = None
     tri_tier_memory: Optional[Any] = None
 
+
 class ISlashCommand(ABC):
     """Command Pattern interface for all interactive terminal slash commands."""
-    
+
     @property
     @abstractmethod
     def name(self) -> str:

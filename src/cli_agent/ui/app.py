@@ -1,25 +1,42 @@
-import sys
 import os
 import re
+import sys
 from typing import Optional
 
-from textual.app import App, ComposeResult
-from textual.containers import Container, ScrollableContainer
-from textual.widgets import Header, Footer, Input, Static, LoadingIndicator, Collapsible, Log, Label
-from textual.binding import Binding
 from textual import work
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Container, ScrollableContainer
+from textual.widgets import (
+    Collapsible,
+    Footer,
+    Header,
+    Input,
+    Label,
+    LoadingIndicator,
+    Log,
+    Static,
+)
 from textual.worker import Worker, WorkerState
 
-from cli_agent.core.engine import DirectAgentEngine
 from cli_agent.core.config_manager import config_manager
+from cli_agent.core.engine import DirectAgentEngine
 from cli_agent.services import (
-    try_fast_path_execution, session_memory,
-    get_system_info, get_env_context_string, history_manager
+    get_env_context_string,
+    get_system_info,
+    history_manager,
+    session_memory,
+    try_fast_path_execution,
 )
 from cli_agent.skills import skill_registry
+from cli_agent.ui.components import (
+    ExecutionCard,
+    RouterCard,
+    SkillPaletteWidget,
+    UserMessage,
+)
 from cli_agent.ui.stream import StreamRedirector
 from cli_agent.ui.styles import APP_CSS
-from cli_agent.ui.components import UserMessage, RouterCard, ExecutionCard, SkillPaletteWidget
 
 
 class CLIAgentApp(App):
@@ -42,7 +59,7 @@ class CLIAgentApp(App):
         os.environ["CREWAI_TRACING_ENABLED"] = "false"
         os.environ["OTEL_SDK_DISABLED"] = "true"
         os.environ["LITELLM_LOG"] = "ERROR"
-        
+
         self.model_name = config_manager.config.model_name
         self.orig_stdout = sys.stdout
         self.orig_stderr = sys.stderr
@@ -51,23 +68,32 @@ class CLIAgentApp(App):
 
     def compose(self) -> ComposeResult:
         active_skills_count = len(skill_registry.list_skills())
-        os_short = self.sys_info['os'].split()[0] if self.sys_info.get('os') else "Linux"
+        os_short = (
+            self.sys_info["os"].split()[0] if self.sys_info.get("os") else "Linux"
+        )
         header_str = f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]AI COMMAND LINE AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
         yield Label(header_str, id="header-info")
-        
+
         with ScrollableContainer(id="chat-container"):
-            yield Static(f"[dim #38bdf8]● AI COMMAND LINE AGENT READY.[/dim #38bdf8]\n[dim #8b949e]Type instructions in plain English or press Ctrl+S for Skills Palette, Ctrl+M for Model Switcher.[/dim #8b949e]")
-            
+            yield Static(
+                f"[dim #38bdf8]● AI COMMAND LINE AGENT READY.[/dim #38bdf8]\n[dim #8b949e]Type instructions in plain English or press Ctrl+S for Skills Palette, Ctrl+M for Model Switcher.[/dim #8b949e]"
+            )
+
         yield SkillPaletteWidget()
 
         with Container(id="spinner-container"):
             yield LoadingIndicator()
 
-        with Collapsible(title="Debug Logs (Ctrl+D)", collapsed=True, id="debug-drawer"):
+        with Collapsible(
+            title="Debug Logs (Ctrl+D)", collapsed=True, id="debug-drawer"
+        ):
             yield Log(id="debug-log")
 
         with Container(id="input-container"):
-            yield Input(placeholder="❯ Enter prompt or command here... (Ctrl+S for skills)", id="cmd-input")
+            yield Input(
+                placeholder="❯ Enter prompt or command here... (Ctrl+S for skills)",
+                id="cmd-input",
+            )
 
         yield Footer()
 
@@ -79,9 +105,13 @@ class CLIAgentApp(App):
 
         try:
             self.agent_engine = DirectAgentEngine()
-            log_widget.write_line(f"[SYSTEM] Skill-based Direct Agent Engine Initialized. Env: {get_env_context_string()}")
+            log_widget.write_line(
+                f"[SYSTEM] Skill-based Direct Agent Engine Initialized. Env: {get_env_context_string()}"
+            )
         except Exception as e:
-            log_widget.write_line(f"[ERROR] Failed to initialize Agent system: {str(e)}")
+            log_widget.write_line(
+                f"[ERROR] Failed to initialize Agent system: {str(e)}"
+            )
 
     def on_unmount(self) -> None:
         """Restore stdout and stderr on exit."""
@@ -91,24 +121,32 @@ class CLIAgentApp(App):
     def action_toggle_skills(self) -> None:
         """Toggle the Skill Palette Popup Modal."""
         palette = self.query_one("#skill-palette", SkillPaletteWidget)
-        palette.styles.display = "none" if palette.styles.display == "block" else "block"
+        palette.styles.display = (
+            "none" if palette.styles.display == "block" else "block"
+        )
 
     def action_switch_model(self) -> None:
         """Launches the interactive Model & Provider Selector modal screen."""
         from cli_agent.ui.components import ModelSelectorModal
+
         def handle_model_selected(new_model: str) -> None:
             if new_model:
                 self.model_name = new_model
                 header_info = self.query_one("#header-info", Label)
                 active_skills_count = len(skill_registry.list_skills())
-                header_info.update(f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{new_model}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]")
+                header_info.update(
+                    f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{new_model}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
+                )
+
         self.push_screen(ModelSelectorModal(), handle_model_selected)
 
     def action_clear_memory(self) -> None:
         """Clears session memory buffer."""
         session_memory.clear()
         chat_container = self.query_one("#chat-container", ScrollableContainer)
-        chat_container.mount(RouterCard("**[Memory System]** Session memory buffer cleared."))
+        chat_container.mount(
+            RouterCard("**[Memory System]** Session memory buffer cleared.")
+        )
 
     def action_toggle_debug(self) -> None:
         """Toggle the collapsible debug log drawer."""
@@ -166,7 +204,9 @@ class CLIAgentApp(App):
         chat_container.scroll_end(animate=False)
 
         active_skills_count = len(skill_registry.list_skills())
-        header_info.update(f"[bold #d29922]●[/bold #d29922] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [bold #d29922]Processing...[/bold #d29922]")
+        header_info.update(
+            f"[bold #d29922]●[/bold #d29922] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [bold #d29922]Processing...[/bold #d29922]"
+        )
         spinner.styles.display = "block"
 
         self.process_agent_task(user_text)
@@ -177,7 +217,10 @@ class CLIAgentApp(App):
         req_clean = user_request.strip()
         if req_clean.lower() in ["clear", "/clear", "reset"]:
             session_memory.clear()
-            return {"routing": "**[Memory System]** Session memory cleared.", "execution": "Conversation context has been reset."}
+            return {
+                "routing": "**[Memory System]** Session memory cleared.",
+                "execution": "Conversation context has been reset.",
+            }
 
         try:
             fast_res = try_fast_path_execution(req_clean)
@@ -193,7 +236,10 @@ class CLIAgentApp(App):
                 err_msg = "Task execution timed out while waiting for model generation. Consider breaking down your prompt."
             elif "Task '" in err_msg:
                 err_msg = re.sub(r"Task '.*?' ", "", err_msg)
-            return {"routing": "Routing error encountered.", "execution": f"Error executing task: {err_msg}"}
+            return {
+                "routing": "Routing error encountered.",
+                "execution": f"Error executing task: {err_msg}",
+            }
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """Callback when the background worker thread completes."""
@@ -205,7 +251,9 @@ class CLIAgentApp(App):
 
             active_skills_count = len(skill_registry.list_skills())
             spinner.styles.display = "none"
-            header_info.update(f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]")
+            header_info.update(
+                f"[bold #7ee787]●[/bold #7ee787] [bold #f0f6fc]CLI AGENT[/bold #f0f6fc]  │  [dim #8b949e]{self.model_name}[/dim #8b949e]  │  [dim #8b949e]Branch: {self.sys_info['git_branch']}[/dim #8b949e]  │  [dim #8b949e]Skills: {active_skills_count}[/dim #8b949e]"
+            )
 
             if data.get("routing"):
                 chat_container.mount(RouterCard(data["routing"]))
@@ -218,4 +266,5 @@ class CLIAgentApp(App):
 def run_tui():
     """Launches the Box-Free Native Terminal Engine."""
     from cli_agent.ui.native_app import run_native_app
+
     run_native_app()

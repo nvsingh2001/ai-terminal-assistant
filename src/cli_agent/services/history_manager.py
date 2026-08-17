@@ -4,9 +4,13 @@ from typing import List
 HISTORY_FILE = os.path.expanduser("~/.cli-agent/history")
 MAX_HISTORY_ENTRIES = 200
 
+
 class HistoryManager:
     """Manages persistent user command prompt history for TUI and CLI input navigation."""
-    def __init__(self, filepath: str = HISTORY_FILE, max_entries: int = MAX_HISTORY_ENTRIES):
+
+    def __init__(
+        self, filepath: str = HISTORY_FILE, max_entries: int = MAX_HISTORY_ENTRIES
+    ):
         self.filepath = filepath
         self.max_entries = max_entries
         self.history: List[str] = []
@@ -18,7 +22,7 @@ class HistoryManager:
             try:
                 with open(self.filepath, "r", encoding="utf-8") as f:
                     lines = [line.strip() for line in f if line.strip()]
-                    self.history = lines[-self.max_entries:]
+                    self.history = lines[-self.max_entries :]
             except Exception:
                 self.history = []
 
@@ -27,11 +31,11 @@ class HistoryManager:
         cmd = command.strip()
         if not cmd:
             return
-            
+
         # Avoid duplicate consecutive entries
         if self.history and self.history[-1] == cmd:
             return
-            
+
         self.history.append(cmd)
         if len(self.history) > self.max_entries:
             self.history.pop(0)
@@ -46,6 +50,7 @@ class HistoryManager:
 
     def get_entries(self) -> List[str]:
         return list(self.history)
+
 
 # Global history singleton
 history_manager = HistoryManager()

@@ -107,6 +107,62 @@ class ConfigManager:
         self.config.verbose = verbose
         self.save_config(self.config)
 
+    def set_api_key(self, key_name: str, key_value: str):
+        """
+        Updates and persists an API key globally in ~/.cli-agent/.env and ~/.cli-agent/config.yaml.
+        Ensures keys remain accessible across all project repositories without project .env collisions.
+        """
+        key_name = key_name.strip().upper()
+        key_value = key_value.strip()
+        os.environ[key_name] = key_value
+
+        # 1. Update config.yaml api_keys dict
+        provider_map = {
+            "OPENAI_API_KEY": "openai",
+            "ANTHROPIC_API_KEY": "anthropic",
+            "GEMINI_API_KEY": "gemini",
+            "GOOGLE_API_KEY": "gemini",
+            "OLLAMA_API_KEY": "ollama",
+            "OLLAMA_API_BASE": "ollama_base"
+        }
+        provider = provider_map.get(key_name, key_name.lower())
+        if self.config.api_keys is None:
+            self.config.api_keys = {}
+        self.config.api_keys[provider] = key_value
+        self.save_config(self.config)
+
+        # 2. Persist to global ~/.cli-agent/.env
+        config_dir = os.path.expanduser("~/.cli-agent")
+        global_env_path = os.path.join(config_dir, ".env")
+        os.makedirs(config_dir, exist_ok=True)
+        
+        lines = []
+        if os.path.exists(global_env_path):
+            try:
+                with open(global_env_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+            except Exception:
+                lines = []
+
+        found = False
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith(f"{key_name}=") or stripped.startswith(f"export {key_name}="):
+                new_lines.append(f"{key_name}={key_value}\n")
+                found = True
+            else:
+                new_lines.append(line)
+
+        if not found:
+            new_lines.append(f"{key_name}={key_value}\n")
+
+        try:
+            with open(global_env_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
+            print(f"Warning: Could not persist key to {global_env_path}: {e}")
+
 
 # Global singleton instance
 config_manager = ConfigManager()

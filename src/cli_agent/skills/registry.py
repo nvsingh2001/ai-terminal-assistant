@@ -1,15 +1,18 @@
+import importlib.util
 import os
 import sys
-import importlib.util
 from typing import Dict, List, Optional
+
 from cli_agent.skills.base import BaseSkill, SkillManifest
 
 USER_SKILLS_DIR = os.path.expanduser("~/.cli-agent/skills")
+
 
 class SkillRegistry:
     """
     Dynamic discovery and execution engine for built-in and user-custom skills.
     """
+
     def __init__(self):
         self._skills: Dict[str, BaseSkill] = {}
         self.discover_skills()
@@ -23,10 +26,16 @@ class SkillRegistry:
         """Discovers built-in skills and user skills from ~/.cli-agent/skills/."""
         # 1. Load Built-in Skills (Direct Import Guarantee)
         try:
-            from cli_agent.skills.builtins.shell_execution.handler import ShellExecutionSkill
-            from cli_agent.skills.builtins.file_management.handler import FileManagementSkill
             from cli_agent.skills.builtins.code_editing.handler import CodeEditingSkill
-            from cli_agent.skills.builtins.git_operations.handler import GitOperationsSkill
+            from cli_agent.skills.builtins.file_management.handler import (
+                FileManagementSkill,
+            )
+            from cli_agent.skills.builtins.git_operations.handler import (
+                GitOperationsSkill,
+            )
+            from cli_agent.skills.builtins.shell_execution.handler import (
+                ShellExecutionSkill,
+            )
 
             self.register(ShellExecutionSkill())
             self.register(FileManagementSkill())
@@ -49,14 +58,20 @@ class SkillRegistry:
             if os.path.isdir(skill_folder) and os.path.exists(handler_path):
                 try:
                     module_name = f"skill_{item}"
-                    spec = importlib.util.spec_from_file_location(module_name, handler_path)
+                    spec = importlib.util.spec_from_file_location(
+                        module_name, handler_path
+                    )
                     if spec and spec.loader:
                         mod = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(mod)
                         # Instantiate skill class if present
                         for attr_name in dir(mod):
                             attr = getattr(mod, attr_name)
-                            if isinstance(attr, type) and issubclass(attr, BaseSkill) and attr is not BaseSkill:
+                            if (
+                                isinstance(attr, type)
+                                and issubclass(attr, BaseSkill)
+                                and attr is not BaseSkill
+                            ):
                                 instance = attr()
                                 self.register(instance)
                 except Exception as e:
@@ -79,6 +94,7 @@ class SkillRegistry:
             return skill.execute(**kwargs)
         except Exception as e:
             return f"Error executing skill '{skill_name}': {str(e)}"
+
 
 # Global singleton SkillRegistry instance
 skill_registry = SkillRegistry()

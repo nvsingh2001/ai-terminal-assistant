@@ -1,6 +1,8 @@
-from rich.table import Table
 from rich.panel import Panel
-from cli_agent.commands.base import ISlashCommand, CommandContext
+from rich.table import Table
+
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class MemoryCommand(ISlashCommand):
     """

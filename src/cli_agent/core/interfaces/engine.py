@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Callable, Dict, Optional
+
 
 class IAgentEngine(ABC):
     """Abstract interface for agent task execution engines (Strategy Pattern)."""

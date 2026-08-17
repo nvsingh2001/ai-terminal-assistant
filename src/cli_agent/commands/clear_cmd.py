@@ -1,4 +1,5 @@
-from cli_agent.commands.base import ISlashCommand, CommandContext
+from cli_agent.commands.base import CommandContext, ISlashCommand
+
 
 class ClearCommand(ISlashCommand):
     """Clears conversation buffer and session memory."""

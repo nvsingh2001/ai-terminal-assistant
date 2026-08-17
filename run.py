@@ -1,9 +1,9 @@
-import sys
 import os
+import sys
 
 # Add src directory to path for standard and PyInstaller frozen execution
-if getattr(sys, 'frozen', False):
-    bundle_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    bundle_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(bundle_dir, "src"))
     sys.path.insert(0, bundle_dir)
 else:

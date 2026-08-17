@@ -1,18 +1,20 @@
+import json
 import os
 import sqlite3
-import json
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from cli_agent.core.interfaces.memory import IMemoryStore, MemoryEpisode, ProjectFact
 
 DEFAULT_DB_PATH = os.path.expanduser("~/.cli-agent/memory.db")
+
 
 class SQLiteMemoryStore(IMemoryStore):
     """
     High-Performance Production Long-Term Memory Store powered by SQLite with WAL mode.
     Manages Global, Project-Scoped, and Episodic Memory partitions.
     """
+
     def __init__(self, db_path: str = DEFAULT_DB_PATH):
         self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
@@ -59,12 +61,16 @@ class SQLiteMemoryStore(IMemoryStore):
                     timestamp TEXT NOT NULL
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_project ON episodic_history(project_id)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_episodes_project ON episodic_history(project_id)"
+            )
             conn.commit()
 
     def get_global_preferences(self) -> Dict[str, str]:
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT key, value FROM global_preferences ORDER BY key")
+            cursor = conn.execute(
+                "SELECT key, value FROM global_preferences ORDER BY key"
+            )
             return {row["key"]: row["value"] for row in cursor.fetchall()}
 
     def set_global_preference(self, key: str, value: str) -> None:
@@ -73,7 +79,7 @@ class SQLiteMemoryStore(IMemoryStore):
             conn.execute(
                 "INSERT INTO global_preferences (key, value, updated_at) VALUES (?, ?, ?) "
                 "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
-                (key.strip(), value.strip(), now)
+                (key.strip(), value.strip(), now),
             )
             conn.commit()
 
@@ -81,25 +87,27 @@ class SQLiteMemoryStore(IMemoryStore):
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "SELECT key, value, category, updated_at FROM project_facts WHERE project_id = ? ORDER BY category, key",
-                (project_id,)
+                (project_id,),
             )
             return [
                 ProjectFact(
                     key=row["key"],
                     value=row["value"],
                     category=row["category"],
-                    updated_at=row["updated_at"]
+                    updated_at=row["updated_at"],
                 )
                 for row in cursor.fetchall()
             ]
 
-    def set_project_fact(self, project_id: str, key: str, value: str, category: str = "general") -> None:
+    def set_project_fact(
+        self, project_id: str, key: str, value: str, category: str = "general"
+    ) -> None:
         now = datetime.utcnow().isoformat()
         with self._get_connection() as conn:
             conn.execute(
                 "INSERT INTO project_facts (project_id, key, value, category, updated_at) VALUES (?, ?, ?, ?, ?) "
                 "ON CONFLICT(project_id, key) DO UPDATE SET value=excluded.value, category=excluded.category, updated_at=excluded.updated_at",
-                (project_id, key.strip(), value.strip(), category.strip(), now)
+                (project_id, key.strip(), value.strip(), category.strip(), now),
             )
             conn.commit()
 
@@ -108,24 +116,32 @@ class SQLiteMemoryStore(IMemoryStore):
         project_id: str,
         user_prompt: str,
         solution_summary: str,
-        tools_used: Optional[List[str]] = None
+        tools_used: Optional[List[str]] = None,
     ) -> int:
         now = datetime.utcnow().isoformat()
         tools_json = json.dumps(tools_used or [])
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "INSERT INTO episodic_history (project_id, user_prompt, solution_summary, tools_used, timestamp) VALUES (?, ?, ?, ?, ?)",
-                (project_id, user_prompt.strip(), solution_summary.strip(), tools_json, now)
+                (
+                    project_id,
+                    user_prompt.strip(),
+                    solution_summary.strip(),
+                    tools_json,
+                    now,
+                ),
             )
             conn.commit()
             return cursor.lastrowid
 
-    def get_recent_episodes(self, project_id: str, limit: int = 5) -> List[MemoryEpisode]:
+    def get_recent_episodes(
+        self, project_id: str, limit: int = 5
+    ) -> List[MemoryEpisode]:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 "SELECT id, project_id, user_prompt, solution_summary, tools_used, timestamp "
                 "FROM episodic_history WHERE project_id = ? ORDER BY id DESC LIMIT ?",
-                (project_id, limit)
+                (project_id, limit),
             )
             episodes = []
             for row in cursor.fetchall():
@@ -140,19 +156,24 @@ class SQLiteMemoryStore(IMemoryStore):
                         user_prompt=row["user_prompt"],
                         solution_summary=row["solution_summary"],
                         tools_used=tools,
-                        timestamp=row["timestamp"]
+                        timestamp=row["timestamp"],
                     )
                 )
             return episodes
 
-    def search_episodes(self, project_id: str, query: str, limit: int = 3) -> List[MemoryEpisode]:
+    def search_episodes(
+        self, project_id: str, query: str, limit: int = 3
+    ) -> List[MemoryEpisode]:
         keywords = [w.lower() for w in query.split() if len(w) > 3][:5]
         if not keywords:
             return self.get_recent_episodes(project_id, limit=limit)
 
         with self._get_connection() as conn:
             # Build simple SQL LIKE matching
-            clauses = ["(LOWER(user_prompt) LIKE ? OR LOWER(solution_summary) LIKE ?)" for _ in keywords]
+            clauses = [
+                "(LOWER(user_prompt) LIKE ? OR LOWER(solution_summary) LIKE ?)"
+                for _ in keywords
+            ]
             sql = f"SELECT id, project_id, user_prompt, solution_summary, tools_used, timestamp FROM episodic_history WHERE project_id = ? AND ({' OR '.join(clauses)}) ORDER BY id DESC LIMIT ?"
             params = [project_id]
             for kw in keywords:
@@ -174,19 +195,28 @@ class SQLiteMemoryStore(IMemoryStore):
                         user_prompt=row["user_prompt"],
                         solution_summary=row["solution_summary"],
                         tools_used=tools,
-                        timestamp=row["timestamp"]
+                        timestamp=row["timestamp"],
                     )
                 )
             return episodes
 
-    def delete_memory(self, tier: str, key_or_id: str, project_id: Optional[str] = None) -> bool:
+    def delete_memory(
+        self, tier: str, key_or_id: str, project_id: Optional[str] = None
+    ) -> bool:
         with self._get_connection() as conn:
             if tier == "global":
-                cursor = conn.execute("DELETE FROM global_preferences WHERE key = ?", (key_or_id,))
+                cursor = conn.execute(
+                    "DELETE FROM global_preferences WHERE key = ?", (key_or_id,)
+                )
             elif tier == "project" and project_id:
-                cursor = conn.execute("DELETE FROM project_facts WHERE project_id = ? AND key = ?", (project_id, key_or_id))
+                cursor = conn.execute(
+                    "DELETE FROM project_facts WHERE project_id = ? AND key = ?",
+                    (project_id, key_or_id),
+                )
             elif tier == "episode":
-                cursor = conn.execute("DELETE FROM episodic_history WHERE id = ?", (int(key_or_id),))
+                cursor = conn.execute(
+                    "DELETE FROM episodic_history WHERE id = ?", (int(key_or_id),)
+                )
             else:
                 return False
             conn.commit()
@@ -194,6 +224,10 @@ class SQLiteMemoryStore(IMemoryStore):
 
     def clear_project_memory(self, project_id: str) -> None:
         with self._get_connection() as conn:
-            conn.execute("DELETE FROM project_facts WHERE project_id = ?", (project_id,))
-            conn.execute("DELETE FROM episodic_history WHERE project_id = ?", (project_id,))
+            conn.execute(
+                "DELETE FROM project_facts WHERE project_id = ?", (project_id,)
+            )
+            conn.execute(
+                "DELETE FROM episodic_history WHERE project_id = ?", (project_id,)
+            )
             conn.commit()

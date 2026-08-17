@@ -3,6 +3,7 @@ from rich.markdown import Markdown
 
 console = Console()
 
+
 class CLIFormatter:
     """Utility formatter for Rich terminal outputs."""
 
@@ -20,4 +21,6 @@ class CLIFormatter:
     @staticmethod
     def print_info(info_msg: str):
         """Displays informational message."""
-        console.print(f"[bold #38bdf8]ℹ[/bold #38bdf8] [dim #94a3b8]{info_msg}[/dim #94a3b8]")
+        console.print(
+            f"[bold #38bdf8]ℹ[/bold #38bdf8] [dim #94a3b8]{info_msg}[/dim #94a3b8]"
+        )
