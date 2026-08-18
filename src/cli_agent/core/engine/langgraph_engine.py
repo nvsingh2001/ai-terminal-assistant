@@ -175,11 +175,34 @@ class LangGraphAgentEngine(IAgentEngine):
 
         def agent_node(state: AgentState) -> dict:
             response = model_with_tools.invoke(state["messages"])
-            # Extract reasoning/thinking if present
-            if hasattr(response, "additional_kwargs") and response.additional_kwargs:
-                reasoning = response.additional_kwargs.get("reasoning_content") or response.additional_kwargs.get("thought")
-                if reasoning:
-                    self._emit_trace("thinking", reasoning.strip())
+            
+            # Extract reasoning/thinking from all potential model metadata locations
+            reasoning = None
+            if hasattr(response, "response_metadata") and response.response_metadata:
+                reasoning = (
+                    response.response_metadata.get("reasoning_content")
+                    or response.response_metadata.get("thought")
+                    or response.response_metadata.get("message", {}).get("reasoning_content")
+                )
+
+            if not reasoning and hasattr(response, "additional_kwargs") and response.additional_kwargs:
+                reasoning = (
+                    response.additional_kwargs.get("reasoning_content")
+                    or response.additional_kwargs.get("thought")
+                )
+
+            # If model produced textual content alongside tool calls, that content is its thinking/rationale
+            if not reasoning and hasattr(response, "tool_calls") and response.tool_calls and response.content:
+                text_content = str(response.content).strip()
+                if text_content:
+                    reasoning = text_content
+
+            if reasoning:
+                # Strip <think>...</think> tags if present
+                clean_thought = str(reasoning).replace("<think>", "").replace("</think>", "").strip()
+                if clean_thought:
+                    self._emit_trace("thinking", clean_thought)
+
             return {"messages": [response]}
 
         def tool_node(state: AgentState) -> dict:
@@ -244,7 +267,8 @@ class LangGraphAgentEngine(IAgentEngine):
             "1. Use `shell_execution` to run terminal commands in bash.\n"
             "2. When invoking python in a virtualenv, execute `./venv/bin/python <script>` or `python3 <script>`.\n"
             "3. Use `file_management`, `code_editing`, and `git_operations` as appropriate.\n"
-            "4. Format final answers cleanly in Markdown."
+            "4. Briefly state your concise thinking or plan before calling tools.\n"
+            "5. Format final answers cleanly in Markdown."
         )
 
         return "\n\n".join(prompt_parts)
