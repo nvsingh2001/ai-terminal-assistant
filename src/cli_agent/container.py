@@ -13,7 +13,8 @@ from cli_agent.commands.remember_cmd import RememberCommand
 from cli_agent.commands.skills_cmd import SkillsCommand
 from cli_agent.commands.verbose_cmd import VerboseCommand
 from cli_agent.core.config_manager import ConfigManager, config_manager
-from cli_agent.core.engine.pydantic_engine import PydanticAgentEngine
+from cli_agent.core.engine.langgraph_engine import LangGraphAgentEngine
+from cli_agent.core.interfaces.engine import IAgentEngine
 from cli_agent.memory.manager import TriTierMemoryManager, tri_tier_memory
 from cli_agent.services.memory_manager import ConversationMemory, session_memory
 from cli_agent.skills.registry import SkillRegistry, skill_registry
@@ -30,7 +31,7 @@ class ServiceContainer:
     skill_registry: SkillRegistry
     memory_store: ConversationMemory
     tri_tier_memory: TriTierMemoryManager
-    engine: PydanticAgentEngine
+    engine: IAgentEngine
     dispatcher: CommandDispatcher
 
     @classmethod
@@ -41,8 +42,8 @@ class ServiceContainer:
         mem = session_memory
         lt_mem = tri_tier_memory
 
-        # Instantiate PydanticAgentEngine with configured verbose mode & long-term memory
-        engine = PydanticAgentEngine(
+        # Instantiate LangGraphAgentEngine with configured verbose mode & long-term memory
+        engine = LangGraphAgentEngine(
             model_name=cfg.config.model_name,
             skill_registry=skills,
             memory_store=mem,
