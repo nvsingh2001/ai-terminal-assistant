@@ -93,12 +93,22 @@ class LangGraphAgentEngine(IAgentEngine):
             action: str,
             path: str,
             content: Optional[str] = None,
+            start_line: Optional[int] = None,
+            end_line: Optional[int] = None,
             recursive: bool = False,
             query: Optional[str] = None,
         ) -> str:
-            """Manages files and directories (actions: read, write, list, search, delete, info)."""
+            """Manages files and directories (actions: read, write, list, append, outline; supports start_line and end_line pagination)."""
             engine_self._tools_invoked_in_turn.append("file_management")
-            args = {"action": action, "path": path, "content": content, "recursive": recursive, "query": query}
+            args = {
+                "action": action,
+                "path": path,
+                "content": content,
+                "start_line": start_line,
+                "end_line": end_line,
+                "recursive": recursive,
+                "query": query,
+            }
             clean_args = {k: v for k, v in args.items() if v is not None}
             engine_self._emit_trace("tool_call", {"tool": "file_management", "args": clean_args})
             res = engine_self.skill_registry.execute(
@@ -106,6 +116,8 @@ class LangGraphAgentEngine(IAgentEngine):
                 action=action,
                 path=path,
                 content=content,
+                start_line=start_line,
+                end_line=end_line,
                 recursive=recursive,
                 query=query,
             )

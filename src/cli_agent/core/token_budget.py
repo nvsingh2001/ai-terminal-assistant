@@ -96,24 +96,48 @@ class TokenBudgeter:
             return code_text[:2000] + "\n[... Content truncated for token budget ...]"
         return "\n".join(skeleton)
 
-    def budget_text(self, text: str, max_tokens: int = 2500, is_code: bool = False, filename: str = "file.txt") -> str:
+    def get_model_budget(self, model_name: Optional[str] = None) -> int:
+        """Determines safe token budget based on active model context window capacity."""
+        target_model = (model_name or self.model_name or "").lower()
+        # Large context window models (128k - 1M+ tokens)
+        large_context_keywords = [
+            "nemotron", "gemini", "gpt-4", "claude", "qwen2.5-coder:32b",
+            "qwen-2.5-coder:32b", "gpt-oss", "gemma4:31b", "deepseek"
+        ]
+        for kw in large_context_keywords:
+            if kw in target_model:
+                return 16000  # ~2,500+ lines of full code without skeletonizing
+
+        return 4000  # Default safe limit for smaller / local models
+
+    def budget_text(
+        self,
+        text: str,
+        max_tokens: Optional[int] = None,
+        is_code: bool = False,
+        filename: str = "file.txt",
+        model_name: Optional[str] = None,
+    ) -> str:
         """
-        Enforces a strict max_tokens budget on input text.
-        If is_code and token limit is exceeded, uses AST skeleton extraction.
+        Enforces a dynamic, model-aware max_tokens budget on input text.
+        If is_code and token limit is exceeded, uses AST skeleton extraction as fallback.
         """
+        limit = max_tokens if max_tokens is not None else self.get_model_budget(model_name)
         current_tokens = self.count_tokens(text)
-        if current_tokens <= max_tokens:
+        if current_tokens <= limit:
             return text
 
         if is_code:
             skeleton = self.extract_ast_skeleton(text, filename)
             skeleton_tokens = self.count_tokens(skeleton)
-            if skeleton_tokens <= max_tokens:
+            if skeleton_tokens <= limit:
                 return f"[AST Skeleton View - Truncated for Token Budget ({current_tokens} -> {skeleton_tokens} tokens)]\n{skeleton}"
 
         # Hard char truncation fallback
-        char_limit = max_tokens * 4
-        return text[:char_limit] + f"\n\n[WARNING: Content truncated from {current_tokens} to ~{max_tokens} tokens for LLM window safety.]"
+        char_limit = limit * 4
+        return text[:char_limit] + f"\n\n[WARNING: Content truncated from {current_tokens} to ~{limit} tokens for LLM window safety.]"
+
 
 # Global TokenBudgeter singleton
 token_budgeter = TokenBudgeter()
+
