@@ -67,6 +67,21 @@ class FileManagementSkill(BaseSkill):
                 
         elif action == "write":
             try:
+                old_content = ""
+                if os.path.exists(target_path) and os.path.isfile(target_path):
+                    with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                        old_content = f.read()
+
+                from cli_agent.core.safety.rollback import rollback_manager
+                from cli_agent.ui.diff_preview import diff_renderer
+                from cli_agent.core.config_manager import config_manager
+
+                policy = config_manager.config.execution_policy
+                if not diff_renderer.request_approval(target_path, old_content, content, policy=policy):
+                    return f"Write cancelled: User rejected the file write to '{path}'."
+
+                rollback_manager.record_pre_edit(target_path)
+
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 with open(target_path, "w", encoding="utf-8") as f:
                     f.write(content)
@@ -76,6 +91,23 @@ class FileManagementSkill(BaseSkill):
                 
         elif action == "append":
             try:
+                old_content = ""
+                if os.path.exists(target_path) and os.path.isfile(target_path):
+                    with open(target_path, "r", encoding="utf-8", errors="ignore") as f:
+                        old_content = f.read()
+
+                new_content = old_content + content
+
+                from cli_agent.core.safety.rollback import rollback_manager
+                from cli_agent.ui.diff_preview import diff_renderer
+                from cli_agent.core.config_manager import config_manager
+
+                policy = config_manager.config.execution_policy
+                if not diff_renderer.request_approval(target_path, old_content, new_content, policy=policy):
+                    return f"Append cancelled: User rejected the file append to '{path}'."
+
+                rollback_manager.record_pre_edit(target_path)
+
                 os.makedirs(os.path.dirname(target_path), exist_ok=True)
                 with open(target_path, "a", encoding="utf-8") as f:
                     f.write(content)

@@ -99,6 +99,18 @@ class CodeEditingSkill(BaseSkill):
                     return f"Error: Target code block to replace was not found exactly in '{actual_path}'."
                     
                 new_content = content.replace(actual_target, actual_replacement, 1)
+
+                from cli_agent.core.safety.rollback import rollback_manager
+                from cli_agent.ui.diff_preview import diff_renderer
+                from cli_agent.core.config_manager import config_manager
+
+                # Request developer approval with unified diff preview
+                policy = config_manager.config.execution_policy
+                if not diff_renderer.request_approval(target_path, content, new_content, policy=policy):
+                    return f"Edit cancelled: User rejected the proposed diff in '{actual_path}'."
+
+                # Create shadow backup snapshot before writing
+                rollback_manager.record_pre_edit(target_path)
                 
                 with open(target_path, "w", encoding="utf-8") as f:
                     f.write(new_content)

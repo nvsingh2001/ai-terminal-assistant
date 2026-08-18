@@ -9,8 +9,10 @@ from cli_agent.commands.forget_cmd import ForgetCommand
 from cli_agent.commands.help_cmd import HelpCommand
 from cli_agent.commands.memory_cmd import MemoryCommand
 from cli_agent.commands.model_cmd import ModelCommand
+from cli_agent.commands.policy_cmd import PolicyCommand
 from cli_agent.commands.remember_cmd import RememberCommand
 from cli_agent.commands.skills_cmd import SkillsCommand
+from cli_agent.commands.undo_cmd import UndoCommand
 from cli_agent.commands.verbose_cmd import VerboseCommand
 from cli_agent.core.config_manager import ConfigManager, config_manager
 from cli_agent.core.engine.langgraph_engine import LangGraphAgentEngine
@@ -69,6 +71,8 @@ class ServiceContainer:
         dispatcher.register(MemoryCommand())
         dispatcher.register(RememberCommand())
         dispatcher.register(ForgetCommand())
+        dispatcher.register(PolicyCommand())
+        dispatcher.register(UndoCommand())
         dispatcher.register(VerboseCommand())
         dispatcher.register(ClearCommand())
         dispatcher.register(HelpCommand())
