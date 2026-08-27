@@ -43,29 +43,36 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      # abetlen's own wheel index has prebuilt CPU wheels for this pin on
-      # Windows/Linux/macOS-arm64, but not macOS-x86_64 (Intel) - that leg
-      # falls through to a from-source CMake build. GGML_NATIVE=off is set
-      # unconditionally (not just for the leg expected to source-compile)
-      # because if any other leg silently falls back to a source build too,
-      # skipping this flag would bake -march=native into a binary built on
-      # the runner's CPU, which can crash with "illegal instruction" on an
-      # end user's different CPU. GGML_METAL=off is scoped to macOS since
-      # the flag doesn't apply elsewhere.
+      # abetlen's own wheel index has prebuilt CPU wheels for Windows/Linux
+      # at this pin (verified: valid zip, matching CRCs). Its macOS-arm64
+      # wheels are used for Windows/Linux only, NOT macOS - independently
+      # confirmed corrupted upstream (Bad CRC-32 on lib/libggml-base*.dylib)
+      # across multiple versions (0.3.30-0.3.35), reproduced both from this
+      # dev machine and from a real macos-14 GitHub Actions run. macOS
+      # therefore always builds from source via PyPI's sdist, which is what
+      # already worked for the Intel leg (no wheel exists for it there
+      # either, so it was already falling through to source before this
+      # was made explicit for arm64 too).
+      #
+      # GGML_NATIVE=off is set for the macOS source build so it doesn't bake
+      # -march=native into a binary built on the runner's CPU, which can
+      # crash with "illegal instruction" on an end user's different CPU.
+      # GGML_METAL=off keeps the build CPU-only and deterministic.
       #
       # NOTE: actions/setup-python's pip cache (above) persists pip's wheel
-      # cache across runs. If a leg source-compiles and these CMAKE_ARGS are
-      # changed later, the cached wheel from the old flags may be reused
-      # silently - bust the cache (bump python-version or clear the Actions
-      # cache) after changing CMAKE_ARGS here.
+      # cache across runs. If these CMAKE_ARGS are changed later, a cached
+      # macOS build from the old flags may be reused silently - bust the
+      # cache (bump python-version or clear the Actions cache) after
+      # changing CMAKE_ARGS here.
       - name: Install llama-cpp-python
         shell: bash
         run: |
-          export CMAKE_ARGS="-DGGML_NATIVE=off"
           if [[ "${{ matrix.os }}" == macos* ]]; then
-            export CMAKE_ARGS="$CMAKE_ARGS -DGGML_METAL=off"
+            export CMAKE_ARGS="-DGGML_NATIVE=off -DGGML_METAL=off"
+            pip install llama-cpp-python==0.3.34
+          else
+            pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu llama-cpp-python==0.3.34
           fi
-          pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu llama-cpp-python==0.3.34
 
       - name: Install Dependencies & PyInstaller
         run: |
