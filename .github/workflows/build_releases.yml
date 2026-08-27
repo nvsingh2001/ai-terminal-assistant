@@ -15,21 +15,19 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    timeout-minutes: 60
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            artifact_name: cli-agent-windows-amd64.exe
-            asset_name: cli-agent-windows-amd64.exe
+            asset_name: aegis-windows-amd64.exe
           - os: macos-14
-            artifact_name: cli-agent
-            asset_name: cli-agent-darwin-arm64
-          - os: macos-13
-            artifact_name: cli-agent
-            asset_name: cli-agent-darwin-amd64
+            asset_name: aegis-darwin-arm64
+          - os: macos-15-intel
+            asset_name: aegis-darwin-amd64
           - os: ubuntu-latest
-            artifact_name: cli-agent
-            asset_name: cli-agent-linux-amd64
+            asset_name: aegis-linux-amd64
 
     steps:
       - name: Checkout Repository
@@ -39,24 +37,111 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      # abetlen's own wheel index has prebuilt CPU wheels for Windows/Linux
+      # at this pin (verified: valid zip, matching CRCs). Its macOS-arm64
+      # wheels are used for Windows/Linux only, NOT macOS - independently
+      # confirmed corrupted upstream (Bad CRC-32 on lib/libggml-base*.dylib)
+      # across multiple versions (0.3.30-0.3.35), reproduced both from this
+      # dev machine and from a real macos-14 GitHub Actions run. macOS
+      # therefore always builds from source via PyPI's sdist, which is what
+      # already worked for the Intel leg (no wheel exists for it there
+      # either, so it was already falling through to source before this
+      # was made explicit for arm64 too).
+      #
+      # GGML_NATIVE=off is set for the macOS source build so it doesn't bake
+      # -march=native into a binary built on the runner's CPU, which can
+      # crash with "illegal instruction" on an end user's different CPU.
+      # GGML_METAL=off keeps the build CPU-only and deterministic.
+      #
+      # NOTE: actions/setup-python's pip cache (above) persists pip's wheel
+      # cache across runs. If these CMAKE_ARGS are changed later, a cached
+      # macOS build from the old flags may be reused silently - bust the
+      # cache (bump python-version or clear the Actions cache) after
+      # changing CMAKE_ARGS here.
+      - name: Install llama-cpp-python
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            export CMAKE_ARGS="-DGGML_NATIVE=off -DGGML_METAL=off"
+            pip install llama-cpp-python==0.3.34
+          else
+            pip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu llama-cpp-python==0.3.34
+          fi
 
       - name: Install Dependencies & PyInstaller
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller==6.22.0
+
+      # Exercises real agent functionality (DI container wiring, all 4
+      # built-in skills, all slash commands) against the actual installed
+      # dependency set on each OS/arch leg - not just import-ability, unlike
+      # the --help smoke test below. No LLM API keys/network required: every
+      # test here is local (subprocess, filesystem, git). Runs before the
+      # (slow) PyInstaller build so a real functional break fails fast
+      # instead of only surfacing after a full binary build.
+      - name: Run Unit & Functional Tests
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
 
       - name: Build Executable Binary
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: python build_installer.py
 
       - name: Rename Artifact for OS Matrix
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            mv dist/cli-agent.exe dist/${{ matrix.asset_name }}
+            mv dist/aegis.exe dist/${{ matrix.asset_name }}
           else
-            mv dist/cli-agent dist/${{ matrix.asset_name }}
+            mv dist/aegis dist/${{ matrix.asset_name }}
           fi
+
+      # Ad-hoc signature only: satisfies Apple Silicon's bare-signature
+      # requirement. Does NOT clear the com.apple.quarantine xattr set on
+      # browser/curl-downloaded files - install.sh strips that client-side.
+      # No Apple Developer ID is available, so real notarization is out of
+      # scope for now. Must run before the smoke test below, not after -
+      # otherwise the bytes actually executed and uploaded were never the
+      # ones tested.
+      - name: Ad-hoc Codesign (macOS)
+        if: runner.os == 'macOS'
+        run: codesign --force --deep -s - dist/${{ matrix.asset_name }}
+
+      # Proves the eager import chain (textual/langgraph/langchain/litellm/
+      # pydantic) is fully bundled - including litellm's eager
+      # tiktoken.get_encoding("cl100k_base") call at import time, which is
+      # the exact class of bug this catches (confirmed via a real CI failure
+      # on macOS Intel: `ValueError: Unknown encoding cl100k_base` when
+      # tiktoken_ext's plugin submodules aren't explicitly hidden-imported).
+      # Does not exercise assets that are truly lazy (textual CSS at mount,
+      # llama_cpp's native lib, which only loads if LLAMA_CPP_MODEL_PATH
+      # points at a real file).
+      - name: Smoke Test Binary
+        shell: bash
+        run: |
+          chmod +x dist/${{ matrix.asset_name }} || true
+          ./dist/${{ matrix.asset_name }} --help
+
+      # Runs the DI container + all 4 built-in skills (shell_execution,
+      # file_management, code_editing, git_operations) inside the actual
+      # frozen binary on this OS/arch, not the source tree - the source-tree
+      # unittest step earlier only proves the source works, which cannot
+      # catch a frozen-only bug (this is exactly how the tiktoken_ext bug
+      # above was missed until a real binary was run). No LLM API keys or
+      # network needed.
+      - name: Functional Selftest Binary
+        shell: bash
+        run: ./dist/${{ matrix.asset_name }} --selftest
 
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4

@@ -63,6 +63,11 @@ Then simply launch from any terminal:
 aegis
 ```
 
+> **macOS troubleshooting**: if Gatekeeper reports the binary as "damaged and can't be opened" or from an unidentified developer, clear the quarantine flag before running it:
+> ```bash
+> xattr -d com.apple.quarantine /path/to/aegis
+> ```
+
 ---
 
 ## Interactive Slash Commands

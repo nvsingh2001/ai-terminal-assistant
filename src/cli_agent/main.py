@@ -24,7 +24,17 @@ def run_cli():
     load_environment()
 
     parser = argparse.ArgumentParser(description="AI Command Line Agent Interface")
-    parser.parse_known_args()
+    parser.add_argument(
+        "--selftest",
+        action="store_true",
+        help="Run non-interactive functional checks (agent wiring, built-in skills) and exit.",
+    )
+    args, _ = parser.parse_known_args()
+
+    if args.selftest:
+        from cli_agent.selftest import run_selftest
+
+        sys.exit(run_selftest())
 
     # Launch next-generation native terminal interface
     run_native_app()

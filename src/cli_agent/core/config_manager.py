@@ -45,6 +45,7 @@ class AgentConfig:
     provider: str = "auto"
     llama_cpp_model_path: str = ""
     verbose: bool = False
+    execution_policy: str = "trusted-read"  # Options: strict, trusted-read, yolo
     temperature: float = 0.1
     max_tokens: int = 4096
     api_keys: Dict[str, str] = None
@@ -106,6 +107,13 @@ class ConfigManager:
         """Updates and persists verbose/trace mode."""
         self.config.verbose = verbose
         self.save_config(self.config)
+
+    def set_execution_policy(self, policy: str):
+        """Updates and persists execution policy mode (strict, trusted-read, yolo)."""
+        clean_policy = policy.strip().lower()
+        if clean_policy in ("strict", "trusted-read", "yolo"):
+            self.config.execution_policy = clean_policy
+            self.save_config(self.config)
 
     def set_api_key(self, key_name: str, key_value: str):
         """

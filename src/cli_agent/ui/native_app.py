@@ -135,10 +135,10 @@ class NativeCLIAgent:
             console.print()
             return
 
-        # PydanticAI Agent execution
+        # LangGraph Agent execution
         if self.verbose_enabled:
             console.print(
-                f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]**[PydanticAI Engine]** Trace mode active with Long-Term Memory[/dim #94a3b8]\n"
+                f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]**[LangGraph Engine]** Trace mode active with Long-Term Memory[/dim #94a3b8]\n"
             )
             res = self.container.engine.run_task(req_clean)
         else:
@@ -150,7 +150,7 @@ class NativeCLIAgent:
                 transient=True,
             ):
                 res = self.container.engine.run_task(req_clean)
-            routing_info = res.get("routing", "PydanticAI Routing")
+            routing_info = res.get("routing", "LangGraph Routing")
             console.print(
                 f"[bold #a855f7]⚡ Skill Routing:[/bold #a855f7] [dim #94a3b8]{routing_info}[/dim #94a3b8]\n"
             )

@@ -22,7 +22,8 @@ elif [ "$OS" = "Linux" ]; then
     if [ "$ARCH" = "x86_64" ] || [ "$ARCH" = "amd64" ]; then
         BINARY_NAME="aegis-linux-amd64"
     else
-        BINARY_NAME="aegis-linux-amd64"
+        echo "Unsupported Linux architecture: $ARCH (only x86_64 is currently built)"
+        exit 1
     fi
 else
     echo "Unsupported Operating System: $OS"
@@ -36,6 +37,13 @@ DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/$BINARY_NAME"
 echo "Downloading $BINARY_NAME from GitHub Releases..."
 curl -fsSL "$DOWNLOAD_URL" -o "$EXE_PATH"
 chmod +x "$EXE_PATH"
+
+# Clears the quarantine flag some macOS setups apply to downloaded files,
+# which otherwise makes Gatekeeper report the binary as "damaged".
+if [ "$OS" = "Darwin" ]; then
+    xattr -d com.apple.quarantine "$EXE_PATH" 2>/dev/null || true
+fi
+
 ln -sf "$EXE_PATH" "$ALIAS_PATH"
 
 echo "Successfully installed aegis to $EXE_PATH (and symlinked $ALIAS_PATH)"
