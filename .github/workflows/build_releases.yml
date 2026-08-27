@@ -79,6 +79,19 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller==6.22.0
 
+      # Exercises real agent functionality (DI container wiring, all 4
+      # built-in skills, all slash commands) against the actual installed
+      # dependency set on each OS/arch leg - not just import-ability, unlike
+      # the --help smoke test below. No LLM API keys/network required: every
+      # test here is local (subprocess, filesystem, git). Runs before the
+      # (slow) PyInstaller build so a real functional break fails fast
+      # instead of only surfacing after a full binary build.
+      - name: Run Unit & Functional Tests
+        shell: bash
+        env:
+          PYTHONPATH: src
+        run: python -m unittest discover -s tests -v
+
       - name: Build Executable Binary
         env:
           MACOSX_DEPLOYMENT_TARGET: '11.0'
@@ -118,6 +131,17 @@ jobs:
         run: |
           chmod +x dist/${{ matrix.asset_name }} || true
           ./dist/${{ matrix.asset_name }} --help
+
+      # Runs the DI container + all 4 built-in skills (shell_execution,
+      # file_management, code_editing, git_operations) inside the actual
+      # frozen binary on this OS/arch, not the source tree - the source-tree
+      # unittest step earlier only proves the source works, which cannot
+      # catch a frozen-only bug (this is exactly how the tiktoken_ext bug
+      # above was missed until a real binary was run). No LLM API keys or
+      # network needed.
+      - name: Functional Selftest Binary
+        shell: bash
+        run: ./dist/${{ matrix.asset_name }} --selftest
 
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
