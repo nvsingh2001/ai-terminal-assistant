@@ -70,10 +70,22 @@ def build():
         "tiktoken",
         "--collect-all",
         "tiktoken_ext",
+        # tiktoken discovers encoding plugins via pkgutil.iter_modules() at
+        # runtime, not a static import, so --collect-all alone doesn't
+        # guarantee PyInstaller's frozen import machinery can find this
+        # submodule. Without it, litellm's eager `get_encoding("cl100k_base")`
+        # call at import time raises `ValueError: Unknown encoding
+        # cl100k_base` - confirmed via a real CI failure on macOS Intel.
+        "--hidden-import",
+        "tiktoken_ext",
+        "--hidden-import",
+        "tiktoken_ext.openai_public",
         "--collect-all",
         "prompt_toolkit",
         "--collect-all",
         "rich",
+        "--collect-all",
+        "llama_cpp",
         "--collect-all",
         "langgraph",
         "--collect-all",
