@@ -80,17 +80,25 @@ jobs:
           pip install pyinstaller==6.22.0
 
       # Exercises real agent functionality (DI container wiring, all 4
-      # built-in skills, all slash commands) against the actual installed
+      # built-in skills, all slash commands, safety/rollback, config
+      # persistence, model-provider resolution) against the actual installed
       # dependency set on each OS/arch leg - not just import-ability, unlike
       # the --help smoke test below. No LLM API keys/network required: every
-      # test here is local (subprocess, filesystem, git). Runs before the
-      # (slow) PyInstaller build so a real functional break fails fast
-      # instead of only surfacing after a full binary build.
+      # test here is local (subprocess, filesystem, git) or uses a mocked
+      # network call. Runs before the (slow) PyInstaller build so a real
+      # functional break fails fast instead of only surfacing after a full
+      # binary build. pytest replaces `unittest discover` as the runner (it
+      # still runs the pre-existing unittest.TestCase files unchanged) so
+      # pyproject.toml's pythonpath/markers config and coverage reporting
+      # apply; the real-inference DeepEval suite under evals/ is a
+      # deliberately separate, opt-in layer (see .github/workflows/eval_suite.yml)
+      # and is never collected here.
+      - name: Install Dev/Test Dependencies
+        run: pip install -r requirements-dev.txt
+
       - name: Run Unit & Functional Tests
         shell: bash
-        env:
-          PYTHONPATH: src
-        run: python -m unittest discover -s tests -v
+        run: pytest -q --cov=src/cli_agent --cov-report=term-missing
 
       - name: Build Executable Binary
         env:

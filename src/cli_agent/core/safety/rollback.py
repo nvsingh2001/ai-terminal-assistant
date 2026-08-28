@@ -39,10 +39,16 @@ class RollbackManager:
 
         self.transaction_stack: List[EditTransaction] = []
         self._current_transaction: Optional[EditTransaction] = None
+        self._transaction_seq: int = 0
 
     def begin_transaction(self, transaction_id: Optional[str] = None) -> EditTransaction:
         """Starts a new atomic edit transaction."""
-        t_id = transaction_id or f"tx_{int(time.time() * 1000)}"
+        # A monotonic counter (not just a millisecond timestamp) guarantees a
+        # unique transaction_id even for back-to-back transactions that
+        # complete within the same clock tick, which otherwise causes
+        # same-file backups from different transactions to collide.
+        self._transaction_seq += 1
+        t_id = transaction_id or f"tx_{int(time.time() * 1000)}_{self._transaction_seq}"
         self._current_transaction = EditTransaction(transaction_id=t_id)
         return self._current_transaction
 
@@ -65,7 +71,11 @@ class RollbackManager:
 
         file_exists = os.path.exists(abs_path)
         path_hash = hashlib.sha256(abs_path.encode()).hexdigest()[:12]
-        backup_filename = f"{path_hash}_{os.path.basename(abs_path)}.bak"
+        # Filename must be scoped to this transaction, not just the file path -
+        # otherwise editing the same file across two separate transactions
+        # makes the second snapshot silently overwrite the first backup file,
+        # corrupting the earlier transaction's rollback data.
+        backup_filename = f"{self._current_transaction.transaction_id}_{path_hash}_{os.path.basename(abs_path)}.bak"
         backup_path = os.path.join(self.session_dir, backup_filename)
 
         if file_exists:
