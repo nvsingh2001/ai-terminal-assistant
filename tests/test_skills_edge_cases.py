@@ -210,7 +210,11 @@ def test_git_operations_status_on_real_repo():
         result = skill.execute(operation="status")
     finally:
         os.chdir(cwd)
-    assert "branch" in result.lower()
+    # "On branch X" on a normal checkout, but "HEAD detached at pull/N/merge"
+    # under GitHub Actions' pull_request trigger (merge-commit checkout, not
+    # a named branch) - see test_agent_bootstrap.py for the same fix.
+    lowered = result.lower()
+    assert "branch" in lowered or "head detached" in lowered, result
 
 
 def test_git_operations_commit_injects_message_flag(work_dir, monkeypatch):
