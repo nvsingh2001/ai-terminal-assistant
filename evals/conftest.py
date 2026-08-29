@@ -10,6 +10,7 @@ import os
 import subprocess
 
 import pytest
+from deepeval.models import LocalModel
 from rich.console import Console
 
 from cli_agent.container import ServiceContainer
@@ -19,7 +20,21 @@ from cli_agent.memory.manager import tri_tier_memory
 from cli_agent.memory.sqlite_store import SQLiteMemoryStore
 from cli_agent.services.memory_manager import session_memory
 
-EVAL_MODEL_NAME = os.getenv("EVAL_MODEL_NAME", "openai/gpt-4o-mini")
+# Ollama Cloud, not a hosted-API provider - the model under test is resolved
+# the same way the real app resolves any bare/`ollama/`-prefixed model name
+# (see LangChainModelResolver.resolve_model): local Ollama probe first, then
+# fall back to https://ollama.com/v1 with OLLAMA_API_KEY.
+EVAL_MODEL_NAME = os.getenv("EVAL_MODEL_NAME", "ollama/qwen3.5:4b")
+EVAL_JUDGE_MODEL_NAME = os.getenv("EVAL_JUDGE_MODEL", "gpt-oss:120b")
+
+
+def _ollama_cloud_base_url() -> str:
+    """Mirrors LangChainModelResolver's own OLLAMA_API_BASE normalization,
+    so the DeepEval judge hits the same endpoint shape the app itself uses."""
+    remote_base = os.getenv("OLLAMA_API_BASE", "https://ollama.com/v1").rstrip("/")
+    if not remote_base.endswith("/v1"):
+        remote_base = f"{remote_base}/v1"
+    return remote_base
 
 
 @pytest.fixture(autouse=True)
@@ -77,3 +92,16 @@ def scratch_repo(tmp_path, monkeypatch):
 def container(scratch_repo):
     """A real ServiceContainer pointed at EVAL_MODEL_NAME, ready to run real tasks."""
     return ServiceContainer.create_default(console=Console(), prompt_session=None)
+
+
+@pytest.fixture
+def judge_model():
+    """DeepEval's LLM-judge, pointed at Ollama Cloud's OpenAI-compatible
+    endpoint via DeepEval's generic LocalModel - avoids any dependency on
+    OpenAI/Anthropic/Gemini keys for scoring, matching EVAL_MODEL_NAME's
+    provider."""
+    return LocalModel(
+        model=EVAL_JUDGE_MODEL_NAME,
+        api_key=os.getenv("OLLAMA_API_KEY", "ollama"),
+        base_url=_ollama_cloud_base_url(),
+    )

@@ -3,7 +3,7 @@ name: Real-Inference Eval Suite
 # Opt-in only, unlike build_releases.yml's pytest gate: these tests hit a
 # real hosted LLM API (cost + non-determinism), so they never run on every
 # push/PR. Trigger manually via `gh workflow run eval_suite.yml` once
-# OPENAI_API_KEY is set in repo secrets. No cron - avoid surprise billing
+# OLLAMA_API_KEY is set in repo secrets. No cron - avoid surprise billing
 # until that's explicitly wanted later.
 on:
   workflow_dispatch:
@@ -36,7 +36,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      # OLLAMA_API_BASE is intentionally left unset here (not just empty) so
+      # the app's own default (https://ollama.com/v1) applies. To point at a
+      # different Ollama Cloud endpoint, add an OLLAMA_API_BASE repo/env
+      # variable and reference it here with `${{ vars.OLLAMA_API_BASE }}`.
       - name: Run Real-Inference Eval Suite
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: deepeval test run evals/ -v

@@ -2,8 +2,9 @@
 (and produce a relevant answer) for a natural-language prompt?
 
 Runs the real LangGraphAgentEngine end-to-end against EVAL_MODEL_NAME (see
-conftest.py) - no mocking of the model. Requires a live API key for that
-provider, plus one for DeepEval's own LLM-judge (defaults to OpenAI).
+conftest.py) - no mocking of the model. Both the model under test and
+DeepEval's own LLM-judge run against Ollama Cloud, so only OLLAMA_API_KEY is
+required - no OpenAI/Anthropic/Gemini keys needed.
 """
 import pytest
 from deepeval import assert_test
@@ -39,7 +40,7 @@ SCENARIOS = [
 ]
 
 
-def _run_scenario(container, prompt, expected_tools):
+def _run_scenario(container, judge_model, prompt, expected_tools):
     result = container.engine.run_task(prompt)
     tools_invoked = list(dict.fromkeys(container.engine._tools_invoked_in_turn))
 
@@ -50,26 +51,28 @@ def _run_scenario(container, prompt, expected_tools):
         expected_tools=[ToolCall(name=t) for t in expected_tools],
     )
 
-    tool_correctness = ToolCorrectnessMetric(threshold=0.5)
+    tool_correctness = ToolCorrectnessMetric(threshold=0.5, model=judge_model)
     relevance = GEval(
         name="Relevance",
         criteria="Determine whether the actual output directly and correctly addresses the input request.",
         evaluation_params=[SingleTurnParams.INPUT, SingleTurnParams.ACTUAL_OUTPUT],
         threshold=0.5,
+        model=judge_model,
     )
     assert_test(test_case, [tool_correctness, relevance])
 
 
 @pytest.mark.parametrize("prompt, expected_tools", SCENARIOS)
-def test_agent_picks_correct_skill(container, prompt, expected_tools):
-    _run_scenario(container, prompt, expected_tools)
+def test_agent_picks_correct_skill(container, judge_model, prompt, expected_tools):
+    _run_scenario(container, judge_model, prompt, expected_tools)
 
 
-def test_agent_checks_python_syntax(container, scratch_repo):
+def test_agent_checks_python_syntax(container, judge_model, scratch_repo):
     target = scratch_repo / "sample.py"
     target.write_text("def add(a, b):\n    return a + b\n")
     _run_scenario(
         container,
+        judge_model,
         f"Check whether the Python file at {target} has valid syntax.",
         ["code_editing"],
     )
