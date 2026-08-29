@@ -23,3 +23,10 @@ dist/
 .idea/
 .vscode/
 .DS_Store
+
+# Test / coverage artifacts
+.coverage
+.pytest_cache/
+htmlcov/
+.deepeval-cache.json
+.deepeval_telemetry.txt

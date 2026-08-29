@@ -83,11 +83,14 @@ class TestAgentBootstrap(unittest.TestCase):
             result = self.container.skill_registry.execute("git_operations", operation="status")
         finally:
             os.chdir(cwd)
-        # A real `git status` on a real repo (actions/checkout gives one on
-        # every CI leg) always mentions the branch; asserting on that (vs.
-        # merely "no error") also fails if git is missing or cwd isn't a
-        # repo, not just if the operation name were rejected.
-        self.assertIn("branch", result.lower())
+        # A real `git status` on a real repo always mentions its position -
+        # "On branch X" on a normal checkout, but "HEAD detached at
+        # pull/N/merge" under GitHub Actions' pull_request trigger (which
+        # checks out the merge commit, not a named branch). Asserting on
+        # either (vs. merely "no error") still fails if git is missing or
+        # cwd isn't a repo, not just if the operation name were rejected.
+        lowered = result.lower()
+        self.assertTrue("branch" in lowered or "head detached" in lowered, result)
 
 
 if __name__ == "__main__":
