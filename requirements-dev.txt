@@ -1,3 +1,10 @@
 pytest>=8.0.0
 pytest-cov>=5.0.0
-deepeval>=2.0.0
+# Floor matters here, not just a preference: deepeval<4.0 (e.g. 2.5.5, which
+# a clean pip resolve picks without this floor) imports `langchain.schema`
+# at module load time - a path removed by the langchain 1.x that
+# requirements.txt's langchain-core/-openai/-anthropic pull in transitively,
+# so the whole `deepeval` CLI fails with ModuleNotFoundError before any
+# eval even runs. 4.2.0 is confirmed working against this repo's exact
+# dependency set (see .github/workflows/eval_suite.yml run history).
+deepeval>=4.2.0
