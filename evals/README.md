@@ -19,10 +19,16 @@ compatible) - the same remote-Ollama path `LangChainModelResolver` already
 uses for the real app (see `src/cli_agent/core/llm/langchain_resolver.py`).
 Only `OLLAMA_API_KEY` is required; no OpenAI/Anthropic/Gemini key is needed.
 
-- **Model under test**: `EVAL_MODEL_NAME` (default `ollama/qwen3.5:4b` - fast/cheap).
+- **Model under test**: `EVAL_MODEL_NAME` (default `ollama/gemma4:31b`).
 - **DeepEval's judge**: `EVAL_JUDGE_MODEL` (default `gpt-oss:120b` - a stronger
   model for scoring, wired via DeepEval's `LocalModel` pointed at the same
   Ollama Cloud endpoint - see `judge_model` fixture in `conftest.py`).
+
+Both defaults must be models actually published on Ollama Cloud, not just any
+locally-pullable tag - `src/cli_agent/commands/model_cmd.py`'s own `/model`
+menu is the source of truth for which tags are `[... - Cloud]` vs.
+`[Local Ollama - ...]`; picking the latter here fails on any runner without
+a local Ollama daemon.
 
 ## Why this is opt-in, not part of every push
 
