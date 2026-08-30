@@ -132,7 +132,15 @@ class LangGraphAgentEngine(IAgentEngine):
             new_string: Optional[str] = None,
             line_number: Optional[int] = None,
         ) -> str:
-            """Edits code files with exact string replacement or line insertions."""
+            """Searches, edits, and checks the syntax of code files.
+
+            action: one of "search", "edit", "check_syntax".
+            - "search": find occurrences of `old_string` in `file_path` (a file or directory).
+            - "edit": replace the first exact match of `old_string` with `new_string` in `file_path`.
+            - "check_syntax": validate that `file_path` (a .py file) is syntactically valid Python.
+              Always use this action for syntax-check requests instead of reasoning about the
+              code yourself or shelling out to a compiler.
+            """
             engine_self._tools_invoked_in_turn.append("code_editing")
             args = {
                 "file_path": file_path,
