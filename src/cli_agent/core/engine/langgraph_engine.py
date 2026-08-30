@@ -1,6 +1,6 @@
 import asyncio
 import os
-from typing import Annotated, Any, Callable, Dict, List, Optional, Sequence, TypedDict
+from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Sequence, Type, TypedDict
 
 import nest_asyncio
 from langchain_core.messages import (
@@ -10,16 +10,50 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
-from langchain_core.tools import tool
+from langchain_core.tools import StructuredTool
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
+from pydantic import BaseModel, Field, create_model
 
 from cli_agent.core.interfaces.engine import IAgentEngine
 from cli_agent.core.llm.langchain_resolver import LangChainModelResolver
 from cli_agent.memory.manager import TriTierMemoryManager
 from cli_agent.services.env_detector import get_env_context_string
 from cli_agent.services.memory_manager import ConversationMemory
+from cli_agent.skills.base import BaseSkill
 from cli_agent.skills.registry import SkillRegistry
+
+_JSON_SCHEMA_TYPES: Dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+}
+
+
+def _schema_to_pydantic_model(skill_name: str, schema: Optional[Dict[str, Any]]) -> Type[BaseModel]:
+    """Converts a SkillManifest's JSON-schema `parameters_schema` into a Pydantic
+    model for use as a LangChain tool's `args_schema`.
+
+    The manifest is each skill's single source of truth for what it does and
+    accepts - deriving the tool schema from it (instead of a hand-typed
+    function signature) keeps what the LLM sees permanently in sync with what
+    the skill actually implements, and covers user-custom skills too.
+    """
+    properties = (schema or {}).get("properties", {})
+    required = set((schema or {}).get("required", []))
+    fields: Dict[str, Any] = {}
+    for field_name, field_schema in properties.items():
+        base_type = _JSON_SCHEMA_TYPES.get(field_schema.get("type", "string"), str)
+        if "enum" in field_schema:
+            base_type = Literal[tuple(field_schema["enum"])]
+        description = field_schema.get("description", "")
+        if field_name in required:
+            fields[field_name] = (base_type, Field(..., description=description))
+        else:
+            fields[field_name] = (Optional[base_type], Field(default=None, description=description))
+    model_name = "".join(part.title() for part in skill_name.split("_")) + "Args"
+    return create_model(model_name, **fields)
 
 
 class AgentState(TypedDict):
@@ -75,108 +109,33 @@ class LangGraphAgentEngine(IAgentEngine):
         """Toggles verbose trace mode."""
         self.verbose = verbose
 
-    def _build_tools(self) -> list:
-        """Constructs LangChain tools wrapping Aegis's SkillRegistry with real-time trace hooks."""
+    def _make_tool(self, skill: BaseSkill) -> StructuredTool:
+        """Wraps a single skill as a LangChain StructuredTool, deriving its name,
+        description, and argument schema from the skill's own SkillManifest."""
+        manifest = skill.manifest
+        skill_name = manifest.name
+        args_model = _schema_to_pydantic_model(skill_name, manifest.parameters_schema)
         engine_self = self
 
-        @tool
-        def shell_execution(command: str) -> str:
-            """Executes a bash shell command on the host terminal."""
-            engine_self._tools_invoked_in_turn.append("shell_execution")
-            engine_self._emit_trace("tool_call", {"tool": "shell_execution", "args": {"command": command}})
-            res = engine_self.skill_registry.execute("shell_execution", command=command)
-            engine_self._emit_trace("tool_result", {"tool": "shell_execution", "output": res})
+        def _run(**kwargs) -> str:
+            clean_args = {k: v for k, v in kwargs.items() if v is not None}
+            engine_self._tools_invoked_in_turn.append(skill_name)
+            engine_self._emit_trace("tool_call", {"tool": skill_name, "args": clean_args})
+            res = engine_self.skill_registry.execute(skill_name, **clean_args)
+            engine_self._emit_trace("tool_result", {"tool": skill_name, "output": res})
             return res
 
-        @tool
-        def file_management(
-            action: str,
-            path: str,
-            content: Optional[str] = None,
-            start_line: Optional[int] = None,
-            end_line: Optional[int] = None,
-            recursive: bool = False,
-            query: Optional[str] = None,
-        ) -> str:
-            """Manages files and directories (actions: read, write, list, append, outline; supports start_line and end_line pagination)."""
-            engine_self._tools_invoked_in_turn.append("file_management")
-            args = {
-                "action": action,
-                "path": path,
-                "content": content,
-                "start_line": start_line,
-                "end_line": end_line,
-                "recursive": recursive,
-                "query": query,
-            }
-            clean_args = {k: v for k, v in args.items() if v is not None}
-            engine_self._emit_trace("tool_call", {"tool": "file_management", "args": clean_args})
-            res = engine_self.skill_registry.execute(
-                "file_management",
-                action=action,
-                path=path,
-                content=content,
-                start_line=start_line,
-                end_line=end_line,
-                recursive=recursive,
-                query=query,
-            )
-            engine_self._emit_trace("tool_result", {"tool": "file_management", "output": res})
-            return res
+        return StructuredTool.from_function(
+            func=_run,
+            name=skill_name,
+            description=manifest.description,
+            args_schema=args_model,
+        )
 
-        @tool
-        def code_editing(
-            file_path: str,
-            action: str,
-            old_string: Optional[str] = None,
-            new_string: Optional[str] = None,
-            line_number: Optional[int] = None,
-        ) -> str:
-            """Edits code files with exact string replacement or line insertions."""
-            engine_self._tools_invoked_in_turn.append("code_editing")
-            args = {
-                "file_path": file_path,
-                "action": action,
-                "old_string": old_string,
-                "new_string": new_string,
-                "line_number": line_number,
-            }
-            clean_args = {k: v for k, v in args.items() if v is not None}
-            engine_self._emit_trace("tool_call", {"tool": "code_editing", "args": clean_args})
-            res = engine_self.skill_registry.execute(
-                "code_editing",
-                file_path=file_path,
-                action=action,
-                old_string=old_string,
-                new_string=new_string,
-                line_number=line_number,
-            )
-            engine_self._emit_trace("tool_result", {"tool": "code_editing", "output": res})
-            return res
-
-        @tool
-        def git_operations(
-            action: str,
-            message: Optional[str] = None,
-            branch: Optional[str] = None,
-            target: Optional[str] = None,
-        ) -> str:
-            """Handles Git version control actions (status, diff, add, commit, checkout, branch, log)."""
-            engine_self._tools_invoked_in_turn.append("git_operations")
-            args = {"action": action, "message": message, "branch": branch, "target": target}
-            clean_args = {k: v for k, v in args.items() if v is not None}
-            engine_self._emit_trace("tool_call", {"tool": "git_operations", "args": clean_args})
-            res = engine_self.skill_registry.execute(
-                "git_operations",
-                action=action,
-                message=message,
-                branch=branch,
-                target=target,
-            )
-            engine_self._emit_trace("tool_result", {"tool": "git_operations", "output": res})
-            return res
-
-        return [shell_execution, file_management, code_editing, git_operations]
+    def _build_tools(self) -> list:
+        """Builds one LangChain tool per skill registered in the SkillRegistry -
+        built-in and user-custom alike - instead of a fixed, hand-maintained set."""
+        return [self._make_tool(skill) for skill in self.skill_registry.get_all_skills()]
 
     def _rebuild_graph(self):
         """Constructs and compiles the LangGraph StateGraph with tools bound."""

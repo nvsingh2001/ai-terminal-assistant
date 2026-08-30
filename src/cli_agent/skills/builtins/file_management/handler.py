@@ -21,9 +21,17 @@ class FileManagementSkill(BaseSkill):
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "action": {"type": "string", "enum": ["read", "write", "list", "append", "outline"]},
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
+                    "action": {
+                        "type": "string",
+                        "enum": ["read", "write", "list", "append", "outline"],
+                        "description": (
+                            "'read': read a file's content. 'write': overwrite a file. "
+                            "'append': add to the end of a file. 'list': list a directory's contents. "
+                            "'outline': show a Python file's AST skeleton (signatures only)."
+                        ),
+                    },
+                    "path": {"type": "string", "description": "The file or directory to operate on."},
+                    "content": {"type": "string", "description": "Text to write/append (for action='write'/'append')."},
                     "start_line": {"type": "integer", "description": "Optional 1-indexed start line for sliced reading."},
                     "end_line": {"type": "integer", "description": "Optional 1-indexed end line for sliced reading."}
                 },

@@ -85,6 +85,10 @@ class SkillRegistry:
         """Returns manifests of all registered skills."""
         return [skill.manifest for skill in self._skills.values()]
 
+    def get_all_skills(self) -> List[BaseSkill]:
+        """Returns all registered skill instances (built-in and user-custom)."""
+        return list(self._skills.values())
+
     def execute(self, skill_name: str, **kwargs) -> str:
         """Executes a registered skill by name."""
         skill = self.get_skill(skill_name)
