@@ -16,17 +16,27 @@ class CodeEditingSkill(BaseSkill):
     def manifest(self) -> SkillManifest:
         return SkillManifest(
             name="code_editing",
-            description="Searches, edits, and checks syntax of code files.",
+            description=(
+                "Searches, edits, and checks the syntax of code files. Always use action="
+                "'check_syntax' for syntax-check requests instead of reasoning about the code "
+                "yourself or shelling out to a compiler."
+            ),
             requires_approval=True,
             parameters_schema={
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["search", "edit", "check_syntax"]},
-                    "path": {"type": "string"},
-                    "target": {"type": "string"},
-                    "replacement": {"type": "string"}
+                    "path": {"type": "string", "description": "The file (or directory, for search) to operate on."},
+                    "target": {
+                        "type": "string",
+                        "description": "For 'search': the substring to find. For 'edit': the exact substring to replace.",
+                    },
+                    "replacement": {
+                        "type": "string",
+                        "description": "For 'edit': the text to replace `target` with.",
+                    },
                 },
-                "required": ["action", "path"]
+                "required": ["action", "path"],
             }
         )
 

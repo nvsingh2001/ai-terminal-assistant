@@ -7,15 +7,24 @@ class GitOperationsSkill(BaseSkill):
     def manifest(self) -> SkillManifest:
         return SkillManifest(
             name="git_operations",
-            description="Executes Git operations (status, diff, add, commit, log, branch).",
+            description="Executes Git operations (status, diff, add, commit, log, branch, checkout, stash).",
             requires_approval=True,
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "operation": {"type": "string", "enum": ["status", "diff", "add", "commit", "log", "branch"]},
-                    "args": {"type": "string"}
+                    "operation": {
+                        "type": "string",
+                        "enum": ["status", "diff", "add", "commit", "log", "branch", "checkout", "stash"],
+                    },
+                    "args": {
+                        "type": "string",
+                        "description": (
+                            "Raw arguments appended after `git <operation>`, e.g. '-m \"message\"' for "
+                            "commit or a branch name for branch/checkout."
+                        ),
+                    },
                 },
-                "required": ["operation"]
+                "required": ["operation"],
             }
         )
 
