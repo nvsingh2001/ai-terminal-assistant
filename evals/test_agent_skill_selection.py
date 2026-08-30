@@ -6,6 +6,8 @@ conftest.py) - no mocking of the model. Both the model under test and
 DeepEval's own LLM-judge run against Ollama Cloud, so only OLLAMA_API_KEY is
 required - no OpenAI/Anthropic/Gemini keys needed.
 """
+import os
+
 import pytest
 from deepeval import assert_test
 from deepeval.metrics import GEval, ToolCorrectnessMetric
@@ -40,7 +42,7 @@ SCENARIOS = [
 ]
 
 
-def _run_scenario(container, judge_model, prompt, expected_tools):
+def _run_scenario(container, judge_model, original_cwd, prompt, expected_tools):
     result = container.engine.run_task(prompt)
     tools_invoked = list(dict.fromkeys(container.engine._tools_invoked_in_turn))
 
@@ -59,20 +61,24 @@ def _run_scenario(container, judge_model, prompt, expected_tools):
         threshold=0.5,
         model=judge_model,
     )
+    # DeepEval writes its own cache relative to cwd when scoring - the agent
+    # needed to run inside scratch_repo's tmp dir, but scoring must not.
+    os.chdir(original_cwd)
     assert_test(test_case, [tool_correctness, relevance])
 
 
 @pytest.mark.parametrize("prompt, expected_tools", SCENARIOS)
-def test_agent_picks_correct_skill(container, judge_model, prompt, expected_tools):
-    _run_scenario(container, judge_model, prompt, expected_tools)
+def test_agent_picks_correct_skill(container, judge_model, original_cwd, prompt, expected_tools):
+    _run_scenario(container, judge_model, original_cwd, prompt, expected_tools)
 
 
-def test_agent_checks_python_syntax(container, judge_model, scratch_repo):
+def test_agent_checks_python_syntax(container, judge_model, original_cwd, scratch_repo):
     target = scratch_repo / "sample.py"
     target.write_text("def add(a, b):\n    return a + b\n")
     _run_scenario(
         container,
         judge_model,
+        original_cwd,
         f"Check whether the Python file at {target} has valid syntax.",
         ["code_editing"],
     )

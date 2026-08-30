@@ -24,8 +24,21 @@ from cli_agent.services.memory_manager import session_memory
 # the same way the real app resolves any bare/`ollama/`-prefixed model name
 # (see LangChainModelResolver.resolve_model): local Ollama probe first, then
 # fall back to https://ollama.com/v1 with OLLAMA_API_KEY.
-EVAL_MODEL_NAME = os.getenv("EVAL_MODEL_NAME", "ollama/qwen3.5:4b")
+#
+# Must be one of the models actually published on Ollama Cloud, not just any
+# locally-pullable tag - src/cli_agent/commands/model_cmd.py's own /model
+# menu labels "qwen3.5:4b" as "[Local Ollama - Fast]" specifically (not
+# Cloud), so a CI runner with no local Ollama fails with a missing-model
+# error against it. gpt-oss:120b and gemma4:31b are both listed there as
+# "[... - Cloud]".
+EVAL_MODEL_NAME = os.getenv("EVAL_MODEL_NAME", "ollama/gemma4:31b")
 EVAL_JUDGE_MODEL_NAME = os.getenv("EVAL_JUDGE_MODEL", "gpt-oss:120b")
+
+# Captured at collection time, before any test/fixture chdir's into a scratch
+# tmp_path - DeepEval writes its own cache relative to os.getcwd() when
+# scoring, so scoring must happen back in this directory, not the agent's
+# scratch working directory.
+_ORIGINAL_CWD = os.getcwd()
 
 
 def _ollama_cloud_base_url() -> str:
@@ -92,6 +105,13 @@ def scratch_repo(tmp_path, monkeypatch):
 def container(scratch_repo):
     """A real ServiceContainer pointed at EVAL_MODEL_NAME, ready to run real tasks."""
     return ServiceContainer.create_default(console=Console(), prompt_session=None)
+
+
+@pytest.fixture
+def original_cwd():
+    """The directory pytest/deepeval was invoked from, for chdir'ing back
+    before DeepEval scores a result (see scratch_repo's docstring)."""
+    return _ORIGINAL_CWD
 
 
 @pytest.fixture
